@@ -20,12 +20,21 @@ Sahibi: İzzet (Hurrian AI — hurrianai.com). İletişim dili: Türkçe.
 - HUD: canlı fiyat, günlük %, ordu sayaçları, öldürme sayıları, güç çubuğu, kill feed (Türkçe)
 - Birim tavanı: taraf başına 110
 
-## Yapılacak ilk iş (kullanıcının talebi)
-1. Bu klasörü `barbarians-btc-wars` adıyla **public** GitHub reposu olarak yayınla
-   (git init → commit → gh repo create → push).
-2. GitHub Pages'ı main branch'ten aktif et.
-3. Canlı URL'yi kullanıcıya ver ve README.md'ye "Canlı Demo / Live Demo" linki olarak ekleyip
-   tekrar push'la.
+## Yayın durumu
+- Repo: github.com/izzetcakmak/barbarians-btc-wars (public), canlı:
+  https://izzetcakmak.github.io/barbarians-btc-wars/ (Pages, main branch)
+
+## Oyun modu (10 Tem 2026'da eklendi)
+- 2 dakikalık **epoch** döngüsü: fiyat yükselirse boğalar, düşerse ayılar kazanır;
+  sonuç canlı modda Binance 1dk mumlarından (REST klines) çözülür.
+- Oyuncu akışı: Google girişi (Firebase) veya misafir → kullanıcı adı → takım seçimi →
+  her epoch hedef fiyat tahmini. Ad + hedef, sahadaki kahraman askerin üzerinde
+  sprite etiketi olarak gezer; kahraman ölürse epoch boyunca yeniden doğar.
+- Puan: takım zaferi +10, kapanışın %0.05'i içinde tahmin +5 bonus.
+- Firebase: `firebase-config.js` varsa Google Auth + Firestore senkronu ve liderlik
+  tablosu aktif; yoksa misafir modu (localStorage). Veri modeli ve kurallar:
+  `firestore.rules`, kurulum: `SETUP-FIREBASE.md`. Firebase projesini kullanıcı
+  konsoldan oluşturacak — config bekleniyor.
 
 ## Olası sonraki adımlar (kullanıcı isterse)
 - Ses efektleri, gece/gündüz döngüsü

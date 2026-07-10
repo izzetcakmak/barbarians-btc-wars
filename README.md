@@ -1,28 +1,48 @@
 # ⚔️ Barbarians BTC Wars
 
-Canlı Bitcoin fiyatını gerçek zamanlı bir savaşa dönüştüren web oyunu.
-A web game that turns the live Bitcoin price into a real-time battle.
+Canlı Bitcoin fiyatını gerçek zamanlı bir savaş oyununa dönüştüren web dApp'i.
+A web game that turns the live Bitcoin price into a real-time battle arena.
 
 **🎮 Canlı Demo / Live Demo: [izzetcakmak.github.io/barbarians-btc-wars](https://izzetcakmak.github.io/barbarians-btc-wars/)**
 
-## Nasıl çalışır / How it works
+## Nasıl oynanır / How to play
+
+1. **Giriş yap** — Google hesabınla (çok oyunculu) ya da misafir olarak.
+2. **Kullanıcı adını seç** ve 🟢 **Boğa Ordusu** veya 💀 **Ayı İskeletleri** takımına katıl.
+3. Her **2 dakikalık epoch** başında **hedef BTC fiyatını** yaz — adın ve hedefin,
+   sahadaki kahraman askerinin üzerinde dolaşır.
+4. Epoch bitiminde fiyat **yükseldiyse boğalar, düştüyse ayılar** turu kazanır:
+   kazanan takımın oyuncuları **+10 puan**, fiyatı %0.05 içinde bilen **+5 isabet bonusu** alır.
+5. Oyun 2 dakikalık epoch'larla sonsuza dek döner; puanlar liderlik tablosunda birikir.
+
+Sign in with Google (multiplayer) or play as guest, pick a username and join the
+bull or bear army. Each 2-minute epoch you submit a target BTC price — your name
+and target float above your hero soldier on the battlefield. When the epoch ends,
+bulls win if price went up, bears win if it went down: winners earn +10 points,
+plus a +5 accuracy bonus for targets within 0.05% of the closing price.
+
+## Savaş motoru / Battle engine
 
 - Binance WebSocket üzerinden **1 saniyelik BTC/USDT mumları** izlenir.
 - 🟢 Yeşil mum → oyuncak askerler (boğalar) cepheye koşar.
 - 🔴 Kırmızı mum → iskeletler (ayılar) mezardan kalkar.
-- Fiyat hareketi ne kadar sertse saldırı dalgası o kadar büyük olur; tek saniyede ~%0.04+ hareket **dev birim** doğurur.
+- Tek saniyede ~%0.04+ hareket **dev birim** doğurur.
 - Bağlantı yoksa oyun otomatik olarak simülasyon moduna geçer.
-
-Every 1-second BTC/USDT candle from Binance spawns an attack wave: green candles spawn bull soldiers, red candles raise bear skeletons. Bigger moves spawn bigger waves; a ~0.04%+ move in one second spawns a giant unit. Falls back to simulation mode if the stream is unavailable.
+- Epoch sonuçları canlı modda Binance 1dk mumlarından çözülür (her istemci için aynı kaynak).
 
 ## Çalıştırma / Run
 
-Tek dosya, bağımlılık yok. `index.html`'i tarayıcıda aç, bitti.
-Single file, zero build. Open `index.html` in a browser — that's it.
+Statik dosyalar, build yok. `index.html`'i tarayıcıda aç — misafir modu hemen çalışır.
+Static files, zero build. Open `index.html` in a browser — guest mode just works.
+
+Çok oyunculu mod (Google girişi + ortak savaş alanı + liderlik tablosu) için
+[SETUP-FIREBASE.md](SETUP-FIREBASE.md) adımlarını izle.
+For multiplayer (Google sign-in, shared battlefield, leaderboard) follow
+[SETUP-FIREBASE.md](SETUP-FIREBASE.md).
 
 ## Teknoloji / Stack
 
-Three.js (r128) · Binance WebSocket API · Vanilla JS — tek HTML dosyası.
+Three.js (r128) · Binance WebSocket API · Firebase Auth + Firestore · Vanilla JS
 
 ---
 Built by [Hurrian AI](https://hurrianai.com) 🎵
