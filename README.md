@@ -43,10 +43,14 @@ For multiplayer (Google sign-in, shared battlefield, leaderboard) follow
 ## Robinhood Chain (on-chain mod)
 
 Oyun [Robinhood Chain](https://chainlist.org/chain/4663) mainnet üzerinde çalışır
-(chainId 4663): kullanıcı adı + takım kaydı ve her epoch'un hedef fiyat tahmini
-zincire yazılır (`contracts/src/BarbariansBtcWars.sol`). Puanlar, zincirdeki
+(chainId 4663): kullanıcı adı + takım kaydı ve hedef fiyat tahminleri zincire
+yazılır (`contracts/src/BarbariansBtcWars.sol`). Tahminler her zaman **bir
+sonraki** epoch'u hedefler — sonuç gönderim anında bilinemez. Puanlar, zincirdeki
 `Prediction` event'leri ve Binance kapanış fiyatlarından istemcide deterministik
 olarak hesaplanır — sunucu/keeper yoktur.
+
+**Kontrat / Contract:**
+[`0xF1fD9a0d84d11A7CB969479C7623304f3ce069eb`](https://robinhoodchain.blockscout.com/address/0xF1fD9a0d84d11A7CB969479C7623304f3ce069eb)
 
 Player registration and per-epoch price predictions live on Robinhood Chain
 mainnet (chain id 4663). Scores are computed client-side from on-chain
