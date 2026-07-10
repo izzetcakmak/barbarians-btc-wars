@@ -15,8 +15,10 @@ Google girişi + gerçek çok oyunculu için ~5 dakikalık tek seferlik kurulum:
 ## 3. Google girişini aç
 1. Sol menü **Build → Authentication → Get started**.
 2. **Sign-in method** sekmesi → **Google** → Enable → kaydet.
-3. **Settings → Authorized domains** listesine `izzetcakmak.github.io` ekle
-   (`localhost` zaten ekli olur).
+3. **Settings → Authorized domains** listesine şu ikisini ekle
+   (`localhost` zaten ekli olur):
+   - `www.barbariansbtcwars.xyz`
+   - `izzetcakmak.github.io`
 
 ## 4. Firestore'u aç
 1. Sol menü **Build → Firestore Database → Create database**.
