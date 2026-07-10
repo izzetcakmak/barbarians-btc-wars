@@ -41,6 +41,15 @@
   #warfill{position:absolute;inset:0;transform-origin:left;
     background:linear-gradient(90deg,#5da13f,#7cc551);transition:transform .5s}
 
+  /* epoch bar */
+  #epochbar{display:flex;justify-content:center;align-items:baseline;gap:18px;
+    margin-top:8px;font-size:12px;letter-spacing:2px;text-shadow:0 1px 4px #000}
+  #epochLabel{opacity:.7}
+  #epochTimer{font-size:20px;font-weight:bold;color:var(--amber)}
+  #epochTimer.ending{color:#ff7a5c;animation:blink .5s infinite alternate}
+  @keyframes blink{to{opacity:.4}}
+  #epochScore .b{color:#8fe06a} #epochScore .s{color:#ded8c8}
+
   #spacer{flex:1}
 
   /* kill feed */
@@ -86,6 +95,11 @@
     </div>
   </div>
   <div id="warbar"><div id="warfill"></div></div>
+  <div id="epochbar">
+    <span id="epochLabel">EPOCH #—</span>
+    <span id="epochTimer">2:00</span>
+    <span id="epochScore"><span class="b" id="scoreBull">0</span> — <span class="s" id="scoreBear">0</span></span>
+  </div>
   <div id="spacer"></div>
   <div id="feed"></div>
 </div>
@@ -313,6 +327,69 @@ function connectBinance(){
   }catch(e){startSim();}
 }
 
+/* ============ EPOCH MOTORU ============ */
+/* Oyun 2 dakikalık turlarla (epoch) döner. Fiyat epoch içinde yükselirse
+   boğalar, düşerse ayılar turu kazanır. Sonuç canlı modda Binance 1dk
+   mumlarından (herkes için aynı kaynak), simülasyonda yerel fiyattan hesaplanır. */
+const EPOCH_MS = 120000;
+let curEpoch = Math.floor(Date.now()/EPOCH_MS);
+let epochOpen = 0;                    /* bu epoch'ta ilk gözlenen fiyat */
+const epochScores = {bull:0, bear:0};
+
+function fmtLeft(ms){
+  const s = Math.max(0, Math.ceil(ms/1000));
+  return Math.floor(s/60)+":"+String(s%60).padStart(2,"0");
+}
+function epochTick(){
+  if(!epochOpen && price) epochOpen = price;   /* epoch ortasında bağlanıldıysa */
+  const now = Date.now();
+  const eid = Math.floor(now/EPOCH_MS);
+  const left = (eid+1)*EPOCH_MS - now;
+  const tEl = $("epochTimer");
+  tEl.textContent = fmtLeft(left);
+  tEl.classList.toggle("ending", left < 15000);
+  if(eid !== curEpoch){
+    const prev = curEpoch;
+    curEpoch = eid;
+    onEpochEnd(prev);
+    onEpochStart(eid);
+  }
+}
+function onEpochStart(eid){
+  epochOpen = price || 0;
+  $("epochLabel").textContent = "EPOCH #" + (eid % 100000);
+  window.dispatchEvent(new CustomEvent("epoch-start",{detail:{eid}}));
+}
+async function onEpochEnd(prevEid){
+  let open = epochOpen, close = price;
+  if(live){
+    try{
+      const startMs = prevEid * EPOCH_MS;
+      const r = await fetch("https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1m&startTime="+startMs+"&limit=2");
+      const k = await r.json();
+      if(Array.isArray(k) && k.length){ open = +k[0][1]; close = +k[k.length-1][4]; }
+    }catch(e){ /* REST yoksa yerel gözlem yeterli */ }
+  }
+  resolveEpoch(prevEid, open, close);
+}
+function resolveEpoch(eid, open, close){
+  const winner = close>open ? "bull" : close<open ? "bear" : null;
+  if(winner){
+    epochScores[winner]++;
+    if(started){
+      banner(winner==="bull" ? "🏆 BOĞALAR EPOCH'U KAZANDI" : "🏆 AYILAR EPOCH'U KAZANDI",
+             winner==="bull" ? "#8fe06a" : "#e8e2d4");
+      spawn(winner, 6, false);          /* zafer dalgası */
+    }
+  }else if(started){
+    banner("EPOCH BERABERE", "#ffb937");
+  }
+  $("scoreBull").textContent = epochScores.bull;
+  $("scoreBear").textContent = epochScores.bear;
+  window.dispatchEvent(new CustomEvent("epoch-resolved",{detail:{eid, open, close, winner}}));
+}
+setInterval(epochTick, 250);
+
 let simOn=false;
 function startSim(){
   if(simOn) return; simOn=true;
@@ -453,6 +530,7 @@ addEventListener("resize",()=>{
 
 /* ============ BAŞLAT ============ */
 connectBinance();
+onEpochStart(curEpoch);
 tick();
 $("startBtn").addEventListener("click",()=>{
   $("intro").remove();
