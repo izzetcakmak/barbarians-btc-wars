@@ -118,9 +118,11 @@
   #predDone{font-size:12px;color:#8fe06a;letter-spacing:1px}
 
   .introBtns{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
-  #googleBtn{pointer-events:auto;font:inherit;font-size:14px;letter-spacing:3px;
+  #googleBtn,#walletBtn{pointer-events:auto;font:inherit;font-size:14px;letter-spacing:3px;
     padding:12px 28px;background:var(--amber);color:#0d0f0a;border:none;cursor:pointer;font-weight:bold}
-  #googleBtn:hover{background:#ffc95e}
+  #googleBtn:hover,#walletBtn:hover{background:#ffc95e}
+  #walletBtn{background:#c76b2e;color:#fff}
+  #walletBtn:hover{background:#e07f3d}
   #intro .err{color:#ff7a5c;font-size:11px;min-height:14px}
 
   #lbBtn{position:fixed;top:46px;left:14px;font-size:11px;letter-spacing:1px;
@@ -203,6 +205,7 @@
      Kırmızı mum → iskeletler mezardan kalkar.<br>
      Fiyat ne kadar sert hareket ederse dalga o kadar büyük olur.</p>
   <div class="introBtns">
+    <button id="walletBtn" class="hidden">🦊 CÜZDAN İLE GİRİŞ</button>
     <button id="googleBtn" class="hidden">🔑 GOOGLE İLE GİRİŞ</button>
     <button id="startBtn">MİSAFİR OLARAK OYNA</button>
   </div>
@@ -584,12 +587,25 @@ function resetPredictUI(){
   $("predDone").classList.add("hidden");
   if(price) $("predInput").value = price.toFixed(2);
 }
-function submitPred(){
+async function submitPred(){
   const t = parseFloat($("predInput").value);
   if(!(t>0) || !me.team) return;
+  if(mode==="chain"){                     /* tahmin zincire yazılır */
+    const btn = $("predBtn");
+    btn.disabled = true; btn.textContent = "ONAY…";
+    try{
+      const tx = await chainSigned().predict(Math.round(t*100));
+      await tx.wait();
+    }catch(e){
+      btn.disabled = false; btn.textContent = "SAVAŞA GİR";
+      feedText('<span class="x">⛓ tahmin gönderilemedi (tx reddedildi)</span>');
+      return;
+    }
+    btn.disabled = false; btn.textContent = "SAVAŞA GİR";
+  }
   myPred = {eid:curEpoch, target:t};
   heroesDesired.set(me.uid, {uid:me.uid, side:me.team, name:me.name, target:t, eid:curEpoch});
-  if(db && fbUser)
+  if(mode==="google" && db && fbUser)
     db.collection("epochs").doc(String(curEpoch)).collection("preds").doc(me.uid)
       .set({name:me.name, team:me.team, target:t, t:Date.now()})
       .catch(e=>console.warn("tahmin yazılamadı", e));
@@ -608,7 +624,14 @@ $("nameBtn").addEventListener("click", async ()=>{
     $("nameErr").textContent = "3–16 karakter: harf, rakam, alt çizgi.";
     return;
   }
-  if(db && fbUser){                     /* kullanıcı adını Firestore'da rezerve et */
+  if(mode==="chain"){
+    if(new TextEncoder().encode(n).length > 32){
+      $("nameErr").textContent = "Bu ad zincir için çok uzun, kısalt.";
+      return;
+    }
+    /* zincirde rezervasyon takım seçiminde register() tx'iyle yapılır */
+  }
+  if(mode==="google" && db && fbUser){  /* kullanıcı adını Firestore'da rezerve et */
     $("nameErr").textContent = "kontrol ediliyor…";
     try{
       const key = n.toLowerCase();
@@ -635,10 +658,25 @@ $("nameBtn").addEventListener("click", async ()=>{
 });
 $("nameInput").addEventListener("keydown", e=>{ if(e.key==="Enter") $("nameBtn").click(); });
 
-function pickTeam(t){
+async function pickTeam(t){
+  if(mode==="chain"){                    /* kayıt/takım zincire yazılır */
+    try{
+      if(!chainRegistered)      await chainRegister(me.name, t);
+      else if(me.team !== t)    await chainSetTeam(t);
+    }catch(e){
+      const msg = String(e.shortMessage||e.message||e);
+      if(msg.indexOf("NameTaken")>=0 || (e.data&&String(e.data).indexOf("0x")===0 && !chainRegistered)){
+        showSetup("name");
+        $("nameErr").textContent = "Bu kullanıcı adı zincirde alınmış, başka bir tane dene.";
+      }else{
+        banner("TX REDDEDİLDİ","#ff7a5c");
+      }
+      return;
+    }
+  }
   me.team = t;
   localStorage.setItem("bbw_team", t);
-  if(db && fbUser)
+  if(mode==="google" && db && fbUser)
     db.collection("players").doc(me.uid).set({team:t}, {merge:true})
       .catch(e=>console.warn("takım yazılamadı", e));
   hideSetup(); updateMe(); resetPredictUI();
@@ -664,8 +702,8 @@ addEventListener("epoch-resolved", e=>{
     if(close && Math.abs(myPred.target-close) <= close*0.0005) gained += 5;  /* isabet bonusu */
     if(gained){
       me.pts += gained;
-      localStorage.setItem("bbw_pts", me.pts);
-      if(db && fbUser)
+      if(mode!=="chain") localStorage.setItem("bbw_pts", me.pts);  /* zincir puanı event'lerden hesaplanır */
+      if(mode==="google" && db && fbUser)
         db.collection("players").doc(me.uid).set({
           points: firebase.firestore.FieldValue.increment(gained),
           wins:   firebase.firestore.FieldValue.increment(winner===me.team ? 1 : 0)
@@ -713,6 +751,7 @@ async function googleLogin(){
       const r = await firebase.auth().signInWithPopup(new firebase.auth.GoogleAuthProvider());
       fbUser = r.user;
     }
+    mode = "google";
     me.uid = fbUser.uid;
     const snap = await db.collection("players").doc(me.uid).get();
     if(snap.exists){
@@ -753,25 +792,205 @@ function subscribePreds(){
     }, err=>console.warn("tahmin akışı hatası", err));
 }
 
-/* liderlik tablosu */
+/* liderlik tablosu: zincir (event'lerden) + Google (Firestore) birleşik */
 $("lbBtn").addEventListener("click", async ()=>{
-  if(!db) return;
   const list=$("lbList");
   list.innerHTML="<li>yükleniyor…</li>";
   $("lbPanel").classList.remove("hidden");
-  try{
-    const q = await db.collection("players").orderBy("points","desc").limit(10).get();
-    list.innerHTML="";
-    q.forEach(doc=>{
-      const d=doc.data();
-      const li=document.createElement("li");
-      li.innerHTML = `<span class="${d.team==="bear"?"s":"b"}">${esc(d.name||"?")}</span> — ${d.points||0} puan`;
-      list.appendChild(li);
-    });
-    if(!q.size) list.innerHTML="<li>henüz oyuncu yok</li>";
-  }catch(e){ list.innerHTML="<li>tablo okunamadı</li>"; }
+  const rows=[];
+  try{ rows.push(...await chainLeaderboard()); }catch(e){}
+  if(db){
+    try{
+      const q = await db.collection("players").orderBy("points","desc").limit(10).get();
+      q.forEach(doc=>{
+        const d=doc.data();
+        rows.push({name:d.name||"?", team:d.team||"bull", pts:d.points||0, src:"🔑"});
+      });
+    }catch(e){}
+  }
+  rows.sort((a,b)=>b.pts-a.pts);
+  list.innerHTML="";
+  for(const r of rows.slice(0,10)){
+    const li=document.createElement("li");
+    li.innerHTML = `<span class="${r.team==="bear"?"s":"b"}">${esc(r.name)}</span> — ${r.pts} puan ${r.src||""}`;
+    list.appendChild(li);
+  }
+  if(!rows.length) list.innerHTML="<li>henüz oyuncu yok</li>";
 });
 $("lbClose").addEventListener("click", ()=>$("lbPanel").classList.add("hidden"));
+
+/* ============ ROBINHOOD CHAIN (cüzdan girişi) ============ */
+/* Kontrat adresi deploy sonrası doldurulur; boşken cüzdan girişi gizli kalır
+   ve oyun Google/misafir modlarıyla çalışmaya devam eder. */
+const CHAIN = {
+  idHex: "0x1237",                                   /* 4663 — Robinhood Chain */
+  name: "Robinhood Chain",
+  rpc: "https://rpc.mainnet.chain.robinhood.com",
+  explorer: "https://robinhoodchain.blockscout.com",
+  contract: ""
+};
+const CHAIN_ABI = [
+  "function players(address) view returns (string name, uint8 team, uint64 joinedAt)",
+  "function register(string name_, uint8 team_)",
+  "function setTeam(uint8 team_)",
+  "function predict(uint64 targetPrice)",
+  "event Prediction(address indexed player, uint256 indexed epoch, uint8 team, uint64 targetPrice, string name)"
+];
+let mode = "guest";                     /* guest | google | chain */
+let ethersLib=null, roContract=null, signer=null, chainRegistered=false;
+
+async function loadEthers(){
+  if(ethersLib) return ethersLib;
+  await loadScript("https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.2/ethers.umd.min.js");
+  ethersLib = window.ethers;
+  return ethersLib;
+}
+async function chainRead(){             /* salt-okur kontrat — tüm ziyaretçiler için */
+  if(!CHAIN.contract) return null;
+  await loadEthers();
+  if(!roContract){
+    const p = new ethersLib.JsonRpcProvider(CHAIN.rpc, undefined, {staticNetwork:true});
+    roContract = new ethersLib.Contract(CHAIN.contract, CHAIN_ABI, p);
+  }
+  return roContract;
+}
+function chainSigned(){ return new ethersLib.Contract(CHAIN.contract, CHAIN_ABI, signer); }
+
+async function walletLogin(){
+  const err = $("authErr");
+  try{
+    if(!window.ethereum){
+      err.textContent = "Cüzdan bulunamadı — MetaMask (metamask.io) kurup tekrar dene.";
+      return;
+    }
+    await loadEthers();
+    const [addr] = await window.ethereum.request({method:"eth_requestAccounts"});
+    try{
+      await window.ethereum.request({method:"wallet_switchEthereumChain",
+        params:[{chainId:CHAIN.idHex}]});
+    }catch(e){
+      if(e.code===4902 || (e.data&&e.data.originalError&&e.data.originalError.code===4902)){
+        await window.ethereum.request({method:"wallet_addEthereumChain", params:[{
+          chainId:CHAIN.idHex, chainName:CHAIN.name, rpcUrls:[CHAIN.rpc],
+          blockExplorerUrls:[CHAIN.explorer],
+          nativeCurrency:{name:"Ether", symbol:"ETH", decimals:18}
+        }]});
+      } else throw e;
+    }
+    const bp = new ethersLib.BrowserProvider(window.ethereum);
+    signer = await bp.getSigner();
+    mode = "chain";
+    me.uid = addr.toLowerCase();
+    const c = await chainRead();
+    const p = await c.players(addr);
+    if(p && p.name){
+      me.name = p.name;
+      me.team = Number(p.team)===2 ? "bear" : "bull";
+      chainRegistered = true;
+    }else{
+      me.name=""; me.team=""; chainRegistered=false;
+    }
+    me.pts = 0;                          /* zincir puanı liderlik hesabından gelir */
+    startGame();
+  }catch(e){
+    err.textContent = "Cüzdan girişi başarısız: " + (e.shortMessage||e.message||e);
+  }
+}
+
+async function chainRegister(name, team){
+  banner("CÜZDAN ONAYI BEKLENİYOR…","#ffb937");
+  const tx = await chainSigned().register(name, team==="bear"?2:1);
+  await tx.wait();
+  chainRegistered = true;
+}
+async function chainSetTeam(team){
+  banner("CÜZDAN ONAYI BEKLENİYOR…","#ffb937");
+  const tx = await chainSigned().setTeam(team==="bear"?2:1);
+  await tx.wait();
+}
+
+/* zincirdeki güncel epoch tahminlerini sahaya yansıt (giriş modu fark etmez) */
+async function pollChainPreds(){
+  if(!started) return;
+  try{
+    const c = await chainRead();
+    if(!c) return;
+    const evs = await c.queryFilter(c.filters.Prediction(null, curEpoch), -3000);
+    for(const ev of evs){
+      const uid = ev.args.player.toLowerCase();
+      if(mode==="chain" && uid===me.uid) continue;
+      heroesDesired.set(uid, {
+        uid,
+        side: Number(ev.args.team)===2 ? "bear" : "bull",
+        name: String(ev.args.name).slice(0,16),
+        target: Number(ev.args.targetPrice)/100,
+        eid: curEpoch
+      });
+    }
+  }catch(e){ /* RPC anlık hatası — bir sonraki turda tekrar */ }
+}
+setInterval(pollChainPreds, 6000);
+
+/* zincir liderliği: son ~500 epoch'un Prediction event'leri + Binance kapanışları */
+let lbCache = {t:0, rows:[]};
+async function chainLeaderboard(){
+  if(Date.now()-lbCache.t < 60000) return lbCache.rows;
+  const c = await chainRead();
+  if(!c) return [];
+  let evs = [];
+  for(const span of [100000, 30000, 9000]){
+    try{ evs = await c.queryFilter(c.filters.Prediction(), -span); break; }
+    catch(e){ /* RPC blok aralığını daraltarak dene */ }
+  }
+  const byEpoch = new Map();
+  for(const ev of evs){
+    const e = Number(ev.args.epoch);
+    if(e >= curEpoch) continue;                       /* bitmemiş epoch */
+    if(!byEpoch.has(e)) byEpoch.set(e, new Map());
+    byEpoch.get(e).set(ev.args.player.toLowerCase(), ev);  /* son event kazanır */
+  }
+  let epochs = [...byEpoch.keys()].sort((a,b)=>a-b);
+  if(!epochs.length){ lbCache={t:Date.now(),rows:[]}; return []; }
+  const last = epochs[epochs.length-1];
+  epochs = epochs.filter(e => e > last-490);          /* 1000 mumluk Binance sınırı */
+  const startMs = epochs[0]*EPOCH_MS, endMs = (last+1)*EPOCH_MS;
+  const kmap = new Map();
+  try{
+    const r = await fetch("https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1m"
+      + "&startTime="+startMs + "&endTime="+(endMs-1) + "&limit=1000");
+    for(const k of await r.json()) kmap.set(+k[0], {o:+k[1], c:+k[4]});
+  }catch(e){ return lbCache.rows; }
+  const scores = new Map();
+  for(const e of epochs){
+    const k1 = kmap.get(e*EPOCH_MS), k2 = kmap.get(e*EPOCH_MS+60000);
+    if(!k1) continue;
+    const open = k1.o, close = (k2||k1).c;
+    const winner = close>open ? "bull" : close<open ? "bear" : null;
+    for(const [uid,ev] of byEpoch.get(e)){
+      const team = Number(ev.args.team)===2 ? "bear" : "bull";
+      const target = Number(ev.args.targetPrice)/100;
+      let pts = 0;
+      if(winner===team) pts += 10;
+      if(Math.abs(target-close) <= close*0.0005) pts += 5;
+      const s = scores.get(uid) || {pts:0};
+      s.pts += pts;
+      s.name = String(ev.args.name);
+      s.team = team;
+      scores.set(uid, s);
+    }
+  }
+  if(mode==="chain" && scores.has(me.uid)){
+    me.pts = scores.get(me.uid).pts;
+    updateMe();
+  }
+  const rows = [...scores.values()].sort((a,b)=>b.pts-a.pts).slice(0,10)
+    .map(s => ({...s, src:"⛓"}));
+  lbCache = {t:Date.now(), rows};
+  return rows;
+}
+
+if(CHAIN.contract) $("walletBtn").classList.remove("hidden");
+$("walletBtn").addEventListener("click", walletLogin);
 
 let simOn=false;
 function startSim(){
@@ -923,6 +1142,7 @@ function startGame(){
     spawn("bull",8); spawn("bear",8);   /* açılış çatışması */
     banner("SAVAŞ BAŞLADI","#ffb937");
   }
+  if(CHAIN.contract || (db && fbUser)) $("lbBtn").classList.remove("hidden");
   if(!me.name)      showSetup("name");
   else if(!me.team) showSetup("team");
   else { updateMe(); resetPredictUI(); }
