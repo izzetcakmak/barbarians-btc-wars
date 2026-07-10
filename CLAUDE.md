@@ -36,6 +36,23 @@ Sahibi: İzzet (Hurrian AI — hurrianai.com). İletişim dili: Türkçe.
   `firestore.rules`, kurulum: `SETUP-FIREBASE.md`. Firebase projesini kullanıcı
   konsoldan oluşturacak — config bekleniyor.
 
+## Robinhood Chain dApp katmanı (10 Tem 2026)
+- Alan adı: www.barbariansbtcwars.xyz (Namecheap'te; Pages cname ayarlandı,
+  kullanıcının DNS kayıtlarını girmesi bekleniyor: CNAME www→izzetcakmak.github.io,
+  apex A 185.199.108/109/110/111.153).
+- Zincir: Robinhood Chain MAINNET, chainId 4663 (0x1237), RPC
+  https://rpc.mainnet.chain.robinhood.com, explorer robinhoodchain.blockscout.com,
+  gas ETH. (1 Temmuz 2026'da açıldı; testnet 46630 ayrı.)
+- Kontrat: contracts/src/BarbariansBtcWars.sol (Foundry, 7 test geçiyor).
+  register(name,team) benzersiz ad + takım; predict(fiyat_cent) her epoch event
+  yayınlar; puanlama istemcide event + Binance kapanışından hesaplanır (keeper yok).
+- Deploy: kullanıcının OWNER cüzdanıyla — contracts/.env'e PRIVATE_KEY (kullanıcı
+  kendisi yazar, sohbete yapıştırmaz), cüzdanda az miktar Robinhood mainnet ETH
+  gerekir. Komut: forge script script/Deploy.s.sol --root contracts --rpc-url
+  robinhood --broadcast. Sonra index.html'de CHAIN.contract doldurulur.
+- Giriş modları: 🦊 cüzdan (MetaMask, zincir kayıt/tahmin) + 🔑 Google (Firebase,
+  config hâlâ bekleniyor) + misafir. Cüzdan butonu CHAIN.contract boşken gizli.
+
 ## Olası sonraki adımlar (kullanıcı isterse)
 - Ses efektleri, gece/gündüz döngüsü
 - cirbet.xyz (Arc Network prediction market) temasıyla renk uyumu

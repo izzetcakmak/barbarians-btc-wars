@@ -12,7 +12,7 @@ contract BarbariansBtcWars {
     uint8 public constant TEAM_BEAR = 2;
 
     struct Player {
-        string name;      // 3-20 bayt, benzersiz
+        string name;      // 3-32 bayt, benzersiz (Türkçe karakterler 2 bayt)
         uint8 team;       // 1 = boğa, 2 = ayı
         uint64 joinedAt;
     }
@@ -48,7 +48,7 @@ contract BarbariansBtcWars {
 
     function register(string calldata name_, uint8 team_) external {
         bytes memory b = bytes(name_);
-        if (b.length < 3 || b.length > 20) revert InvalidName();
+        if (b.length < 3 || b.length > 32) revert InvalidName();
         if (team_ != TEAM_BULL && team_ != TEAM_BEAR) revert InvalidTeam();
 
         bytes32 key = keccak256(b);

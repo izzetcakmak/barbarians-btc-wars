@@ -40,9 +40,29 @@ Static files, zero build. Open `index.html` in a browser — guest mode just wor
 For multiplayer (Google sign-in, shared battlefield, leaderboard) follow
 [SETUP-FIREBASE.md](SETUP-FIREBASE.md).
 
+## Robinhood Chain (on-chain mod)
+
+Oyun [Robinhood Chain](https://chainlist.org/chain/4663) mainnet üzerinde çalışır
+(chainId 4663): kullanıcı adı + takım kaydı ve her epoch'un hedef fiyat tahmini
+zincire yazılır (`contracts/src/BarbariansBtcWars.sol`). Puanlar, zincirdeki
+`Prediction` event'leri ve Binance kapanış fiyatlarından istemcide deterministik
+olarak hesaplanır — sunucu/keeper yoktur.
+
+Player registration and per-epoch price predictions live on Robinhood Chain
+mainnet (chain id 4663). Scores are computed client-side from on-chain
+`Prediction` events plus Binance closing prices — fully serverless.
+
+```bash
+# kontrat testleri / contract tests
+forge test --root contracts
+# deploy (owner cüzdanı, contracts/.env içinde PRIVATE_KEY)
+forge script contracts/script/Deploy.s.sol --root contracts \
+  --rpc-url https://rpc.mainnet.chain.robinhood.com --broadcast
+```
+
 ## Teknoloji / Stack
 
-Three.js (r128) · Binance WebSocket API · Firebase Auth + Firestore · Vanilla JS
+Three.js (r128) · Binance WebSocket API · Robinhood Chain (Solidity + Foundry, ethers.js) · Firebase Auth + Firestore · Vanilla JS
 
 ---
 Built by [Hurrian AI](https://hurrianai.com) 🎵
