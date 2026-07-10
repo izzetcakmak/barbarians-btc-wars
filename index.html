@@ -183,7 +183,7 @@
 </div>
 
 <div id="predict" class="hidden">
-  <label for="predInput">🎯 EPOCH SONU BTC HEDEFİN</label>
+  <label for="predInput">🎯 SONRAKİ EPOCH BTC HEDEFİN</label>
   <input id="predInput" type="number" step="0.01" min="1" placeholder="örn. 63450" inputmode="decimal">
   <button id="predBtn">SAVAŞA GİR</button>
   <span id="predDone" class="hidden"></span>
@@ -496,8 +496,8 @@ const me = {
   team: localStorage.getItem("bbw_team") || "",
   pts: +(localStorage.getItem("bbw_pts") || 0)
 };
-let myPred = null;                 /* {eid, target} */
-const heroesDesired = new Map();   /* uid -> {uid, side, name, target, eid} */
+const myPreds = new Map();         /* hedef eid -> hedef fiyat (tahmin N'de verilir, N+1'i hedefler) */
+const heroesDesired = new Map();   /* uid -> {uid, side, name, target, eid(hedef epoch)} */
 
 const esc = s => String(s).replace(/[&<>"']/g, c =>
   ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -546,11 +546,12 @@ function spawnHeroUnit(d){
     cd:0, target:null, retarget:0, dead:false, phase:Math.random()*7
   });
 }
-/* kahraman sahada değilse (öldü/yeni tahmin) tekrar doğar */
+/* kahraman sahada değilse (öldü/yeni tahmin) tekrar doğar;
+   hedefi geçmişte kalanlar epoch-start temizliğine bırakılır */
 setInterval(()=>{
   if(!started) return;
   for(const d of heroesDesired.values()){
-    if(d.eid!==curEpoch) continue;
+    if(d.eid < curEpoch || d.eid > curEpoch+1) continue;
     if(count(d.side)>=MAXSIDE) continue;
     if(!heroAlive(d.uid)) spawnHeroUnit(d);
   }
@@ -590,30 +591,36 @@ function resetPredictUI(){
 async function submitPred(){
   const t = parseFloat($("predInput").value);
   if(!(t>0) || !me.team) return;
+  /* Tahmin her zaman BİR SONRAKİ epoch'u hedefler: sonuç gönderim anında
+     bilinemez, son-saniye avcılığı işlemez (kontrat da bunu zorlar). */
+  let targetEid = curEpoch + 1;
   if(mode==="chain"){                     /* tahmin zincire yazılır */
     const btn = $("predBtn");
     btn.disabled = true; btn.textContent = "ONAY…";
     try{
-      const tx = await chainSigned().predict(Math.round(t*100));
+      const c = await chainRead();
+      targetEid = Number(await c.currentEpoch()) + 1;   /* zincir saati esas */
+      const signed = await chainSigned();
+      const tx = await signed.predict(Math.round(t*100), targetEid);
       await tx.wait();
     }catch(e){
       btn.disabled = false; btn.textContent = "SAVAŞA GİR";
-      feedText('<span class="x">⛓ tahmin gönderilemedi (tx reddedildi)</span>');
+      feedText('<span class="x">⛓ tahmin gönderilemedi: '+esc(chainErrName(e)||"tx reddedildi")+'</span>');
       return;
     }
     btn.disabled = false; btn.textContent = "SAVAŞA GİR";
   }
-  myPred = {eid:curEpoch, target:t};
-  heroesDesired.set(me.uid, {uid:me.uid, side:me.team, name:me.name, target:t, eid:curEpoch});
+  myPreds.set(targetEid, t);
+  heroesDesired.set(me.uid, {uid:me.uid, side:me.team, name:me.name, target:t, eid:targetEid});
   if(mode==="google" && db && fbUser)
-    db.collection("epochs").doc(String(curEpoch)).collection("preds").doc(me.uid)
+    db.collection("epochs").doc(String(targetEid)).collection("preds").doc(me.uid)
       .set({name:me.name, team:me.team, target:t, t:Date.now()})
       .catch(e=>console.warn("tahmin yazılamadı", e));
   $("predInput").classList.add("hidden");
   $("predBtn").classList.add("hidden");
   const pd = $("predDone");
   pd.classList.remove("hidden");
-  pd.textContent = "⚔ $" + t.toLocaleString("en-US") + " hedefiyle sahadasın!";
+  pd.textContent = "⚔ $" + t.toLocaleString("en-US") + " hedefiyle sonraki epoch'tasın!";
 }
 $("predBtn").addEventListener("click", submitPred);
 $("predInput").addEventListener("keydown", e=>{ if(e.key==="Enter") submitPred(); });
@@ -664,10 +671,13 @@ async function pickTeam(t){
       if(!chainRegistered)      await chainRegister(me.name, t);
       else if(me.team !== t)    await chainSetTeam(t);
     }catch(e){
-      const msg = String(e.shortMessage||e.message||e);
-      if(msg.indexOf("NameTaken")>=0 || (e.data&&String(e.data).indexOf("0x")===0 && !chainRegistered)){
+      const en = chainErrName(e);
+      if(en==="NameTaken"){
         showSetup("name");
         $("nameErr").textContent = "Bu kullanıcı adı zincirde alınmış, başka bir tane dene.";
+      }else if(en==="InvalidName"){
+        showSetup("name");
+        $("nameErr").textContent = "Zincir bu adı kabul etmedi: harf, rakam, _ ve Türkçe karakter kullan.";
       }else{
         banner("TX REDDEDİLDİ","#ff7a5c");
       }
@@ -688,18 +698,21 @@ $("pickBear").addEventListener("click", ()=>pickTeam("bear"));
 $("me").addEventListener("click", ()=>showSetup("team"));   /* takım değiştir */
 
 /* ---- epoch olayları ---- */
+/* Kahraman, hedef epoch'u (eid) bitene kadar sahada kalır: N'de gönderilen
+   tahmin N+1'i hedefler, asker N ve N+1 boyunca savaşır. */
 addEventListener("epoch-start", e=>{
-  for(const [uid,d] of [...heroesDesired]) if(d.eid!==e.detail.eid) heroesDesired.delete(uid);
-  for(const u of units) if(u.hero && u.hero.eid!==e.detail.eid && !u.dead){ u.dead=true; u.deathT=0; }
+  for(const [uid,d] of [...heroesDesired]) if(d.eid < e.detail.eid) heroesDesired.delete(uid);
+  for(const u of units) if(u.hero && u.hero.eid < e.detail.eid && !u.dead){ u.dead=true; u.deathT=0; }
   resetPredictUI();
   if(db && fbUser) subscribePreds();
 });
 addEventListener("epoch-resolved", e=>{
   const {eid, close, winner} = e.detail;
-  if(myPred && myPred.eid===eid && me.team){
+  const target = myPreds.get(eid);
+  if(target !== undefined && me.team){
     let gained = 0;
     if(winner===me.team) gained += 10;
-    if(close && Math.abs(myPred.target-close) <= close*0.0005) gained += 5;  /* isabet bonusu */
+    if(close && Math.abs(target-close) <= close*0.0005) gained += 5;  /* isabet bonusu */
     if(gained){
       me.pts += gained;
       if(mode!=="chain") localStorage.setItem("bbw_pts", me.pts);  /* zincir puanı event'lerden hesaplanır */
@@ -710,15 +723,18 @@ addEventListener("epoch-resolved", e=>{
         }, {merge:true}).catch(err=>console.warn("puan yazılamadı", err));
       feedText(`<span class="${me.team==="bull"?"b":"s"}">${esc(me.name)}</span> +${gained} puan 🏆`);
     }
-    myPred = null;
+    myPreds.delete(eid);
     updateMe();
+    /* zincir modunda kalıcı puanı event'lerden tazele (mum verisi otursun diye kısa gecikme) */
+    if(mode==="chain") setTimeout(()=>chainLeaderboard(true).catch(()=>{}), 5000);
   }
+  for(const k of [...myPreds.keys()]) if(k <= eid) myPreds.delete(k);   /* bayat kayıt temizliği */
 });
 
 /* ============ FIREBASE (Google girişi + çok oyunculu) ============ */
 /* firebase-config.js dosyası window.FIREBASE_CONFIG tanımlarsa Google girişi
    ve Firestore senkronu devreye girer; yoksa oyun misafir modunda kalır. */
-let db=null, fbUser=null, unsubPreds=null;
+let db=null, fbUser=null, unsubPreds=null;   /* unsubPreds: abonelik iptal fonksiyonları dizisi */
 const FB_CONF = window.FIREBASE_CONFIG || null;
 
 const loadScript = src => new Promise((res,rej)=>{
@@ -751,14 +767,15 @@ async function googleLogin(){
       const r = await firebase.auth().signInWithPopup(new firebase.auth.GoogleAuthProvider());
       fbUser = r.user;
     }
+    const snap = await db.collection("players").doc(fbUser.uid).get();
+    /* durum ancak akış başarılıysa değişir */
     mode = "google";
     me.uid = fbUser.uid;
-    const snap = await db.collection("players").doc(me.uid).get();
     if(snap.exists){
       const d = snap.data();
       me.name = d.name || "";
       me.team = d.team || "";
-      me.pts  = d.points || 0;
+      me.pts  = Number(d.points) || 0;
     }else{
       me.name=""; me.team=""; me.pts=0;
     }
@@ -766,6 +783,7 @@ async function googleLogin(){
     startGame();
     subscribePreds();
   }catch(e){
+    if(mode==="google") mode="guest";
     const el=$("authErr");
     if(el) el.textContent = "Giriş başarısız: " + (e.code || e.message || e);
   }
@@ -773,23 +791,26 @@ async function googleLogin(){
 
 function subscribePreds(){
   if(!db) return;
-  if(unsubPreds) unsubPreds();
-  const eid = curEpoch;
-  unsubPreds = db.collection("epochs").doc(String(eid)).collection("preds")
-    .onSnapshot(qs=>{
-      qs.forEach(doc=>{
-        if(doc.id===me.uid) return;              /* kendimiz zaten sahadayız */
-        const d = doc.data();
-        if(!d || !(+d.target>0)) return;
-        heroesDesired.set(doc.id, {
-          uid:doc.id,
-          side: d.team==="bear" ? "bear" : "bull",
-          name: String(d.name||"?").slice(0,16),
-          target:+d.target,
-          eid
+  if(unsubPreds){ for(const u of unsubPreds) u(); }
+  /* hedefi mevcut epoch olanlar (geçen epoch girildi) + sonraki epoch'a
+     şimdi girilenler — ikisi de sahada görünsün */
+  unsubPreds = [curEpoch, curEpoch+1].map(eid =>
+    db.collection("epochs").doc(String(eid)).collection("preds")
+      .onSnapshot(qs=>{
+        qs.forEach(doc=>{
+          if(doc.id===me.uid) return;            /* kendimiz zaten sahadayız */
+          const d = doc.data();
+          if(!d || !(+d.target>0)) return;
+          heroesDesired.set(doc.id, {
+            uid:doc.id,
+            side: d.team==="bear" ? "bear" : "bull",
+            name: String(d.name||"?").slice(0,16),
+            target:+d.target,
+            eid
+          });
         });
-      });
-    }, err=>console.warn("tahmin akışı hatası", err));
+      }, err=>console.warn("tahmin akışı hatası", err))
+  );
 }
 
 /* liderlik tablosu: zincir (event'lerden) + Google (Firestore) birleşik */
@@ -804,7 +825,10 @@ $("lbBtn").addEventListener("click", async ()=>{
       const q = await db.collection("players").orderBy("points","desc").limit(10).get();
       q.forEach(doc=>{
         const d=doc.data();
-        rows.push({name:d.name||"?", team:d.team||"bull", pts:d.points||0, src:"🔑"});
+        /* points sayıya zorlanır — Firestore'a string yazan bir hesap
+           HTML enjekte edemesin */
+        rows.push({name:String(d.name||"?").slice(0,20), team:d.team==="bear"?"bear":"bull",
+                   pts:Number(d.points)||0, src:"🔑"});
       });
     }catch(e){}
   }
@@ -812,10 +836,16 @@ $("lbBtn").addEventListener("click", async ()=>{
   list.innerHTML="";
   for(const r of rows.slice(0,10)){
     const li=document.createElement("li");
-    li.innerHTML = `<span class="${r.team==="bear"?"s":"b"}">${esc(r.name)}</span> — ${r.pts} puan ${r.src||""}`;
+    li.innerHTML = `<span class="${r.team==="bear"?"s":"b"}">${esc(r.name)}</span> — ${Number(r.pts)||0} puan ${r.src==="🔑"?"🔑":"⛓"}`;
     list.appendChild(li);
   }
   if(!rows.length) list.innerHTML="<li>henüz oyuncu yok</li>";
+  else{
+    const note=document.createElement("li");
+    note.style.cssText="list-style:none;opacity:.55;font-size:10px;margin-top:8px";
+    note.textContent="⛓ zincir puanları son ~20 saatin kayıtlarından hesaplanır";
+    list.appendChild(note);
+  }
 });
 $("lbClose").addEventListener("click", ()=>$("lbPanel").classList.add("hidden"));
 
@@ -831,13 +861,31 @@ const CHAIN = {
 };
 const CHAIN_ABI = [
   "function players(address) view returns (string name, uint8 team, uint64 joinedAt)",
+  "function currentEpoch() view returns (uint256)",
   "function register(string name_, uint8 team_)",
   "function setTeam(uint8 team_)",
-  "function predict(uint64 targetPrice)",
-  "event Prediction(address indexed player, uint256 indexed epoch, uint8 team, uint64 targetPrice, string name)"
+  "function predict(uint64 targetPrice, uint256 epoch_)",
+  "event Prediction(address indexed player, uint256 indexed epoch, uint8 team, uint64 targetPrice, string name)",
+  "event Registered(address indexed player, string name, uint8 team)",
+  "event NameReleased(address indexed player, string oldName)",
+  "error InvalidName()", "error NameTaken()", "error InvalidTeam()",
+  "error NotRegistered()", "error InvalidPrice()", "error WrongEpoch()"
 ];
 let mode = "guest";                     /* guest | google | chain */
 let ethersLib=null, roContract=null, signer=null, chainRegistered=false;
+
+/* ethers v6 hatasından kontratın özel hata adını çıkar (NameTaken vb.) */
+function chainErrName(e){
+  try{
+    if(e && e.revert && e.revert.name) return e.revert.name;
+    const data = e && (e.data || (e.info && e.info.error && e.info.error.data));
+    if(data && roContract){
+      const parsed = roContract.interface.parseError(data);
+      if(parsed) return parsed.name;
+    }
+  }catch(_){}
+  return null;
+}
 
 async function loadEthers(){
   if(ethersLib) return ethersLib;
@@ -854,7 +902,39 @@ async function chainRead(){             /* salt-okur kontrat — tüm ziyaretçi
   }
   return roContract;
 }
-function chainSigned(){ return new ethersLib.Contract(CHAIN.contract, CHAIN_ABI, signer); }
+/* aktif ağı ve hesabı her yazma işleminden önce doğrula (cüzdan ağ/hesap
+   değiştirmiş olabilir — yanlış ağda gas yakılmasın) */
+async function ensureChainNow(){
+  const cid = await window.ethereum.request({method:"eth_chainId"});
+  if(cid !== CHAIN.idHex){
+    try{
+      await window.ethereum.request({method:"wallet_switchEthereumChain",
+        params:[{chainId:CHAIN.idHex}]});
+    }catch(e){
+      const needAdd = e.code===4902 || e.code===-32603 ||
+        /unrecognized|not added|4902/i.test(String(e.message||""));
+      if(!needAdd) throw e;
+      await window.ethereum.request({method:"wallet_addEthereumChain", params:[{
+        chainId:CHAIN.idHex, chainName:CHAIN.name, rpcUrls:[CHAIN.rpc],
+        blockExplorerUrls:[CHAIN.explorer],
+        nativeCurrency:{name:"Ether", symbol:"ETH", decimals:18}
+      }]});
+      await window.ethereum.request({method:"wallet_switchEthereumChain",
+        params:[{chainId:CHAIN.idHex}]});
+    }
+    const after = await window.ethereum.request({method:"eth_chainId"});
+    if(after !== CHAIN.idHex) throw new Error("Robinhood Chain'e geçilemedi");
+  }
+}
+async function chainSigned(){
+  await ensureChainNow();
+  const bp = new ethersLib.BrowserProvider(window.ethereum);
+  signer = await bp.getSigner();
+  const sAddr = (await signer.getAddress()).toLowerCase();
+  if(mode==="chain" && me.uid && sAddr !== me.uid)
+    throw new Error("Cüzdanda hesap değişti — sayfayı yenileyip tekrar gir.");
+  return new ethersLib.Contract(CHAIN.contract, CHAIN_ABI, signer);
+}
 
 async function walletLogin(){
   const err = $("authErr");
@@ -865,24 +945,16 @@ async function walletLogin(){
     }
     await loadEthers();
     const [addr] = await window.ethereum.request({method:"eth_requestAccounts"});
-    try{
-      await window.ethereum.request({method:"wallet_switchEthereumChain",
-        params:[{chainId:CHAIN.idHex}]});
-    }catch(e){
-      if(e.code===4902 || (e.data&&e.data.originalError&&e.data.originalError.code===4902)){
-        await window.ethereum.request({method:"wallet_addEthereumChain", params:[{
-          chainId:CHAIN.idHex, chainName:CHAIN.name, rpcUrls:[CHAIN.rpc],
-          blockExplorerUrls:[CHAIN.explorer],
-          nativeCurrency:{name:"Ether", symbol:"ETH", decimals:18}
-        }]});
-      } else throw e;
-    }
+    await ensureChainNow();
     const bp = new ethersLib.BrowserProvider(window.ethereum);
-    signer = await bp.getSigner();
-    mode = "chain";
-    me.uid = addr.toLowerCase();
+    const s = await bp.getSigner();
     const c = await chainRead();
     const p = await c.players(addr);
+    /* durum ancak tüm akış başarılıysa değişir — yarıda kalan giriş
+       misafir akışını zincir moduna kilitlemesin */
+    signer = s;
+    mode = "chain";
+    me.uid = addr.toLowerCase();
     if(p && p.name){
       me.name = p.name;
       me.team = Number(p.team)===2 ? "bear" : "bull";
@@ -890,33 +962,52 @@ async function walletLogin(){
     }else{
       me.name=""; me.team=""; chainRegistered=false;
     }
-    me.pts = 0;                          /* zincir puanı liderlik hesabından gelir */
+    me.pts = 0;                          /* zincir puanı event'lerden hesaplanır */
+    if(window.ethereum.on){
+      window.ethereum.on("chainChanged", ()=>{ signer=null; });          /* sonraki tx yeniden doğrular */
+      window.ethereum.on("accountsChanged", ()=>{ if(mode==="chain") location.reload(); });
+    }
     startGame();
+    chainLeaderboard(true).catch(()=>{});   /* kalıcı puanı yükle */
   }catch(e){
+    signer=null; chainRegistered=false;
+    if(mode==="chain") mode="guest";
     err.textContent = "Cüzdan girişi başarısız: " + (e.shortMessage||e.message||e);
   }
 }
 
 async function chainRegister(name, team){
   banner("CÜZDAN ONAYI BEKLENİYOR…","#ffb937");
-  const tx = await chainSigned().register(name, team==="bear"?2:1);
+  const signed = await chainSigned();
+  const tx = await signed.register(name, team==="bear"?2:1);
   await tx.wait();
   chainRegistered = true;
 }
 async function chainSetTeam(team){
   banner("CÜZDAN ONAYI BEKLENİYOR…","#ffb937");
-  const tx = await chainSigned().setTeam(team==="bear"?2:1);
+  const signed = await chainSigned();
+  const tx = await signed.setTeam(team==="bear"?2:1);
   await tx.wait();
 }
 
-/* zincirdeki güncel epoch tahminlerini sahaya yansıt (giriş modu fark etmez) */
+/* zincirdeki güncel tahminleri sahaya yansıt (giriş modu fark etmez):
+   hedefi curEpoch veya curEpoch+1 olan event'ler → etiketli kahraman.
+   Saat kaymasına dayanıklıdır: epoch topic filtresi yerine blok penceresi
+   çekilir ve event'in kendi epoch'u kullanılır. */
 async function pollChainPreds(){
   if(!started) return;
   try{
     const c = await chainRead();
     if(!c) return;
-    const evs = await c.queryFilter(c.filters.Prediction(null, curEpoch), -3000);
+    let evs = null;
+    for(const span of [3000, 900, 300]){          /* RPC limiti daralırsa geri çekil */
+      try{ evs = await c.queryFilter(c.filters.Prediction(), -span); break; }
+      catch(e){}
+    }
+    if(!evs) return;
     for(const ev of evs){
+      const eid = Number(ev.args.epoch);
+      if(eid < curEpoch || eid > curEpoch+1) continue;
       const uid = ev.args.player.toLowerCase();
       if(mode==="chain" && uid===me.uid) continue;
       heroesDesired.set(uid, {
@@ -924,24 +1015,43 @@ async function pollChainPreds(){
         side: Number(ev.args.team)===2 ? "bear" : "bull",
         name: String(ev.args.name).slice(0,16),
         target: Number(ev.args.targetPrice)/100,
-        eid: curEpoch
+        eid
       });
     }
   }catch(e){ /* RPC anlık hatası — bir sonraki turda tekrar */ }
 }
 setInterval(pollChainPreds, 6000);
 
-/* zincir liderliği: son ~500 epoch'un Prediction event'leri + Binance kapanışları */
+/* zincir liderliği: Prediction event'leri + Binance kapanışları.
+   Robinhood blokları ~100ms olduğundan pencere blokla değil sayfalamayla
+   kurulur: 90k'lık dilimler halinde geriye doğru en çok 8 sayfa (~20 saat)
+   veya 490 epoch dolana kadar taranır (Binance 1000 mum limiti). */
 let lbCache = {t:0, rows:[]};
-async function chainLeaderboard(){
-  if(Date.now()-lbCache.t < 60000) return lbCache.rows;
+async function chainLeaderboard(force){
+  if(!force && Date.now()-lbCache.t < 60000) return lbCache.rows;
   const c = await chainRead();
   if(!c) return [];
-  let evs = [];
-  for(const span of [100000, 30000, 9000]){
-    try{ evs = await c.queryFilter(c.filters.Prediction(), -span); break; }
-    catch(e){ /* RPC blok aralığını daraltarak dene */ }
-  }
+  const evs = [];
+  try{
+    const latest = await c.runner.provider.getBlockNumber();
+    const SPAN = 90000;
+    const epochsSeen = new Set();
+    for(let page=0; page<8; page++){
+      const to = latest - page*SPAN;
+      const from = Math.max(0, to - SPAN + 1);
+      if(to <= 0) break;
+      let chunk = null;
+      for(const width of [SPAN, 30000, 9000]){       /* RPC limiti daralırsa geri çekil */
+        try{ chunk = await c.queryFilter(c.filters.Prediction(), Math.max(0, to-width+1), to); break; }
+        catch(e){}
+      }
+      if(chunk===null) break;
+      evs.push(...chunk);
+      for(const ev of chunk) epochsSeen.add(Number(ev.args.epoch));
+      if(epochsSeen.size >= 490) break;
+      if(from===0) break;
+    }
+  }catch(e){ return lbCache.rows; }
   const byEpoch = new Map();
   for(const ev of evs){
     const e = Number(ev.args.epoch);
@@ -1147,7 +1257,7 @@ function startGame(){
   else if(!me.team) showSetup("team");
   else { updateMe(); resetPredictUI(); }
 }
-$("startBtn").addEventListener("click", ()=>{ me.uid="guest"; startGame(); });
+$("startBtn").addEventListener("click", ()=>{ mode="guest"; me.uid="guest"; startGame(); });
 $("googleBtn").addEventListener("click", googleLogin);
 })();
 </script>
