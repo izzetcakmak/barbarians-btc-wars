@@ -46,12 +46,16 @@ Sahibi: İzzet (Hurrian AI — hurrianai.com). İletişim dili: Türkçe.
 - Kontrat: contracts/src/BarbariansBtcWars.sol (Foundry, 7 test geçiyor).
   register(name,team) benzersiz ad + takım; predict(fiyat_cent) her epoch event
   yayınlar; puanlama istemcide event + Binance kapanışından hesaplanır (keeper yok).
-- Deploy: kullanıcının OWNER cüzdanıyla — contracts/.env'e PRIVATE_KEY (kullanıcı
-  kendisi yazar, sohbete yapıştırmaz), cüzdanda az miktar Robinhood mainnet ETH
-  gerekir. Komut: forge script script/Deploy.s.sol --root contracts --rpc-url
-  robinhood --broadcast. Sonra index.html'de CHAIN.contract doldurulur.
+- DEPLOY EDİLDİ (11 Tem 2026): 0xF1fD9a0d84d11A7CB969479C7623304f3ce069eb,
+  owner = kullanıcının cüzdanı 0xD4F1254C803662c46D9c21f80F4F3c15FF57e2c9.
+  Deploy kaydı contracts/broadcast'ta. Yeniden deploy gerekirse:
+  cwd=contracts (PRIVATE_KEY .env'den yüklenir) →
+  forge script script/Deploy.s.sol:Deploy --rpc-url robinhood --broadcast
+- Oyun kuralı (kontratla uyumlu): tahmin her zaman BİR SONRAKİ epoch'u hedefler;
+  predict(fiyat_cent, epoch) ve epoch != currentEpoch()+1 ise revert. İsimler
+  zincirde beyaz listeli (a-z 0-9 _ + Türkçe) ve büyük/küçük katlamalı benzersiz.
 - Giriş modları: 🦊 cüzdan (MetaMask, zincir kayıt/tahmin) + 🔑 Google (Firebase,
-  config hâlâ bekleniyor) + misafir. Cüzdan butonu CHAIN.contract boşken gizli.
+  config hâlâ bekleniyor) + misafir.
 
 ## Olası sonraki adımlar (kullanıcı isterse)
 - Ses efektleri, gece/gündüz döngüsü
