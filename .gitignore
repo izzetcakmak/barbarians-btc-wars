@@ -1,0 +1,8 @@
+# gizli anahtarlar — asla commit etme
+contracts/.env
+
+# foundry çıktıları
+contracts/out/
+contracts/cache/
+
+node_modules/
