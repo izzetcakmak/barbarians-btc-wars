@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BARBARIANS BTC WARS — canlı BTC savaşı</title>
+<style>
+  :root{
+    --bull:#5da13f; --bear:#e8e2d4; --blood:#b3402e;
+    --ink:#0d0f0a; --sand:#a89a6b; --amber:#ffb937;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:100%;height:100%;overflow:hidden;background:var(--ink);
+    font-family:"Courier New",ui-monospace,monospace;color:#f2eee2;
+    -webkit-user-select:none;user-select:none}
+  canvas{display:block}
+
+  /* ---------- HUD ---------- */
+  #hud{position:fixed;inset:0;pointer-events:none;display:flex;flex-direction:column}
+
+  #ticker{margin:18px auto 0;text-align:center;text-shadow:0 2px 12px rgba(0,0,0,.8)}
+  #price{font-size:clamp(34px,7vw,64px);font-weight:bold;letter-spacing:1px;
+    transition:color .25s}
+  #price.up{color:#8fe06a}
+  #price.down{color:#ff7a5c}
+  #sub{font-size:12px;letter-spacing:3px;opacity:.75;margin-top:2px}
+  #delta{font-weight:bold}
+
+  #armies{display:flex;justify-content:space-between;padding:0 16px;margin-top:14px}
+  .army{background:rgba(10,12,8,.72);border:1px solid rgba(255,255,255,.12);
+    padding:8px 12px;min-width:118px}
+  .army h4{font-size:10px;letter-spacing:2px;font-weight:normal;opacity:.7}
+  .army .n{font-size:26px;font-weight:bold;line-height:1.1}
+  .army .k{font-size:10px;opacity:.65}
+  #bullBox .n{color:#8fe06a}
+  #bearBox{text-align:right}
+  #bearBox .n{color:#f2eee2}
+
+  /* tug-of-war bar */
+  #warbar{height:5px;margin:10px 16px 0;background:#3a3a3a;position:relative;overflow:hidden}
+  #warfill{position:absolute;inset:0;transform-origin:left;
+    background:linear-gradient(90deg,#5da13f,#7cc551);transition:transform .5s}
+
+  #spacer{flex:1}
+
+  /* kill feed */
+  #feed{align-self:flex-start;margin:0 0 14px 16px;font-size:11px;line-height:1.7;
+    text-shadow:0 1px 4px #000;max-width:70vw}
+  #feed div{opacity:0;animation:fin .3s forwards, fout 1s 4s forwards}
+  #feed .b{color:#8fe06a} #feed .s{color:#ded8c8} #feed .x{color:#888}
+  @keyframes fin{to{opacity:1}} @keyframes fout{to{opacity:0}}
+
+  #status{position:fixed;top:14px;right:14px;font-size:10px;letter-spacing:2px;
+    padding:5px 9px;border:1px solid rgba(255,255,255,.2);background:rgba(0,0,0,.55)}
+  #status.live{color:#8fe06a;border-color:#5da13f}
+  #status.sim{color:var(--amber);border-color:var(--amber)}
+
+  #banner{position:fixed;top:38%;left:50%;transform:translate(-50%,-50%) scale(.8);
+    font-size:clamp(22px,5vw,44px);font-weight:bold;letter-spacing:4px;opacity:0;
+    text-shadow:0 0 30px currentColor;pointer-events:none;transition:all .4s}
+  #banner.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+
+  #intro{position:fixed;inset:0;background:rgba(8,9,6,.9);display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:14px;z-index:9;text-align:center;padding:20px}
+  #intro h1{font-size:clamp(28px,6vw,52px);letter-spacing:6px}
+  #intro h1 em{font-style:normal;color:#8fe06a}
+  #intro p{max-width:440px;font-size:13px;line-height:1.8;opacity:.8}
+  #intro button{pointer-events:auto;font:inherit;font-size:14px;letter-spacing:3px;
+    padding:12px 34px;background:var(--bull);color:#0d0f0a;border:none;cursor:pointer;font-weight:bold}
+  #intro button:hover{background:#7cc551}
+  #intro small{opacity:.5;font-size:10px;letter-spacing:1px}
+</style>
+</head>
+<body>
+<div id="hud">
+  <div id="ticker">
+    <div id="price">$--,---.--</div>
+    <div id="sub">BTC/USD &nbsp;·&nbsp; <span id="delta">0.00%</span> &nbsp;·&nbsp; 1sn mum = 1 saldırı dalgası</div>
+  </div>
+  <div id="armies">
+    <div class="army" id="bullBox">
+      <h4>BOĞA ORDUSU</h4><div class="n" id="bullN">0</div><div class="k"><span id="bullK">0</span> öldürme</div>
+    </div>
+    <div class="army" id="bearBox">
+      <h4>AYI İSKELETLERİ</h4><div class="n" id="bearN">0</div><div class="k"><span id="bearK">0</span> öldürme</div>
+    </div>
+  </div>
+  <div id="warbar"><div id="warfill"></div></div>
+  <div id="spacer"></div>
+  <div id="feed"></div>
+</div>
+<div id="status" class="sim">BAĞLANIYOR…</div>
+<div id="banner"></div>
+
+<div id="intro">
+  <h1>BARBARIANS <em>BTC</em> WARS</h1>
+  <p>Her saniyelik Bitcoin mumu bir saldırı dalgasıdır.<br>
+     Yeşil mum → oyuncak askerler cepheye koşar.<br>
+     Kırmızı mum → iskeletler mezardan kalkar.<br>
+     Fiyat ne kadar sert hareket ederse dalga o kadar büyük olur.</p>
+  <button id="startBtn">SAVAŞI BAŞLAT</button>
+  <small>Canlı veri: Binance BTC/USDT · bağlantı yoksa simülasyon devreye girer</small>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+"use strict";
+
+/* ============ TEMEL SAHNE ============ */
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x11130c);
+scene.fog = new THREE.Fog(0x11130c, 60, 170);
+
+const camera = new THREE.PerspectiveCamera(innerWidth<innerHeight?62:50, innerWidth/innerHeight, .1, 400);
+const camFocus = new THREE.Vector3(0,0,0);
+let camDist = 52;
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+document.body.prepend(renderer.domElement);
+
+scene.add(new THREE.HemisphereLight(0xcfd8b0, 0x2a2418, .85));
+const sun = new THREE.DirectionalLight(0xffe9c0, .9);
+sun.position.set(30, 50, 20);
+scene.add(sun);
+
+/* zemin: kumlu ova, mum-fitili gibi bir cephe hattı çizgisi */
+const gCanvas = document.createElement("canvas");
+gCanvas.width = gCanvas.height = 256;
+const gc = gCanvas.getContext("2d");
+gc.fillStyle = "#8f855f"; gc.fillRect(0,0,256,256);
+for(let i=0;i<2600;i++){
+  gc.fillStyle = Math.random()<.5 ? "rgba(0,0,0,.06)" : "rgba(255,255,255,.05)";
+  gc.fillRect(Math.random()*256, Math.random()*256, 2, 2);
+}
+gc.fillStyle = "rgba(60,40,25,.35)";
+gc.fillRect(124,0,8,256); /* cephe hattı izi */
+const gTex = new THREE.CanvasTexture(gCanvas);
+gTex.wrapS = gTex.wrapT = THREE.RepeatWrapping; gTex.repeat.set(6,6);
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(320, 320),
+  new THREE.MeshLambertMaterial({map:gTex})
+);
+ground.rotation.x = -Math.PI/2;
+scene.add(ground);
+
+/* ============ BİRLİK FABRİKASI ============ */
+const bullMat  = new THREE.MeshLambertMaterial({color:0x4f8a35});
+const bullMat2 = new THREE.MeshLambertMaterial({color:0x3f6f2a});
+const boneMat  = new THREE.MeshLambertMaterial({color:0xe8e2d4});
+const boneMat2 = new THREE.MeshLambertMaterial({color:0xc9c2b0});
+const gunMat   = new THREE.MeshLambertMaterial({color:0x2b2b22});
+const bx = (w,h,d,m)=>new THREE.Mesh(new THREE.BoxGeometry(w,h,d), m);
+
+function makeBull(){                       /* plastik oyuncak asker */
+  const g = new THREE.Group();
+  const base = bx(1.2,.12,.7,bullMat2); base.position.y=.06; g.add(base);
+  const lL = bx(.22,.7,.22,bullMat); lL.position.set(-.18,.47,0); g.add(lL);
+  const lR = lL.clone(); lR.position.x=.18; g.add(lR);
+  const body = bx(.62,.7,.4,bullMat); body.position.y=1.15; g.add(body);
+  const head = bx(.34,.3,.34,bullMat); head.position.y=1.68; g.add(head);
+  const helm = bx(.42,.14,.42,bullMat2); helm.position.y=1.85; g.add(helm);
+  const arm = bx(.18,.5,.18,bullMat); arm.position.set(.42,1.2,.1);
+  arm.rotation.x=-1.2; g.add(arm);
+  const gun = bx(.1,.1,.9,gunMat); gun.position.set(.42,1.28,.5); g.add(gun);
+  g.userData={legL:lL,legR:lR,muzzle:gun};
+  return g;
+}
+function makeBear(){                       /* iskelet */
+  const g = new THREE.Group();
+  const lL = bx(.16,.75,.16,boneMat2); lL.position.set(-.16,.5,0); g.add(lL);
+  const lR = lL.clone(); lR.position.x=.16; g.add(lR);
+  const spine = bx(.14,.55,.14,boneMat); spine.position.y=1.15; g.add(spine);
+  for(let i=0;i<3;i++){
+    const rib = bx(.55,.08,.3,boneMat); rib.position.y=1.0+i*.18; g.add(rib);
+  }
+  const skull = bx(.36,.34,.34,boneMat); skull.position.y=1.68; g.add(skull);
+  const eyeL = bx(.09,.09,.05,gunMat); eyeL.position.set(-.09,1.72,.18); g.add(eyeL);
+  const eyeR = eyeL.clone(); eyeR.position.x=.09; g.add(eyeR);
+  const armL = bx(.13,.55,.13,boneMat2); armL.position.set(-.38,1.25,.12);
+  armL.rotation.x=-.9; g.add(armL);
+  const armR = armL.clone(); armR.position.x=.38; g.add(armR);
+  const claw = bx(.5,.06,.06,boneMat2); claw.position.set(0,1.45,.42); g.add(claw);
+  g.userData={legL:lL,legR:lR};
+  return g;
+}
+
+/* ============ SAVAŞ MOTORU ============ */
+const units=[], bullets=[], parts=[];
+const MAXSIDE = 110;
+let bullKills=0, bearKills=0, nextId=1;
+
+function spawn(side, n, giant){
+  for(let i=0;i<n;i++){
+    if(count(side) >= MAXSIDE) return;
+    const mesh = side==="bull" ? makeBull() : makeBear();
+    const x = side==="bull" ? -46-Math.random()*10 : 46+Math.random()*10;
+    mesh.position.set(x, 0, (Math.random()-.5)*44);
+    mesh.rotation.y = side==="bull" ? Math.PI/2 : -Math.PI/2;
+    const s = giant ? 2.2 : .9+Math.random()*.25;
+    mesh.scale.setScalar(s);
+    scene.add(mesh);
+    units.push({
+      id:nextId++, side, mesh, giant:!!giant,
+      hp: giant?260:(side==="bull"?26:34),
+      dmg: giant?18:(side==="bull"?9:8),
+      spd: (side==="bull"?4.2:5.4)*(giant?.8:1)*(0.85+Math.random()*.3),
+      range: side==="bull"? (giant?26:20) : 1.9*s,
+      cd:0, target:null, retarget:0, dead:false, phase:Math.random()*7
+    });
+  }
+}
+const count = s => units.reduce((a,u)=>a+(u.side===s&&!u.dead?1:0),0);
+
+function nearestEnemy(u){
+  let best=null, bd=1e9;
+  for(const v of units){
+    if(v.dead||v.side===u.side) continue;
+    const d = u.mesh.position.distanceToSquared(v.mesh.position);
+    if(d<bd){bd=d;best=v;}
+  }
+  return best;
+}
+
+function kill(victim, killer){
+  victim.dead = true;
+  victim.deathT = 0;
+  if(killer){
+    if(killer.side==="bull") bullKills++; else bearKills++;
+    feed(killer, victim);
+  }
+  burst(victim.mesh.position, victim.side==="bull"?0xb3402e:0xe8e2d4);
+}
+
+function burst(p,color){
+  for(let i=0;i<8;i++){
+    const m = bx(.14,.14,.14,new THREE.MeshBasicMaterial({color}));
+    m.position.copy(p); m.position.y+=1.2;
+    scene.add(m);
+    parts.push({m, vx:(Math.random()-.5)*8, vy:3+Math.random()*5, vz:(Math.random()-.5)*8, t:0});
+  }
+}
+
+function shoot(u, target){
+  const m = bx(.08,.08,.7,new THREE.MeshBasicMaterial({color:0xffd35c}));
+  m.position.copy(u.mesh.position); m.position.y+=1.3*u.mesh.scale.x;
+  const dir = target.mesh.position.clone().setY(1.1).sub(m.position).normalize();
+  m.lookAt(m.position.clone().add(dir));
+  scene.add(m);
+  bullets.push({m, dir, from:u, t:0});
+}
+
+/* ============ HUD ============ */
+const $=id=>document.getElementById(id);
+const feedBox=$("feed");
+function feed(k,v){
+  const d=document.createElement("div");
+  const kn = k.side==="bull"?`<span class="b">BOĞA#${k.id}</span>`:`<span class="s">İSKELET#${k.id}</span>`;
+  const vn = v.side==="bull"?`<span class="b">BOĞA#${v.id}</span>`:`<span class="s">İSKELET#${v.id}</span>`;
+  d.innerHTML = `${kn} <span class="x">☠</span> ${vn}`;
+  feedBox.appendChild(d);
+  while(feedBox.children.length>5) feedBox.firstChild.remove();
+  setTimeout(()=>d.remove(), 5200);
+}
+let bannerT=null;
+function banner(txt,color){
+  const b=$("banner"); b.textContent=txt; b.style.color=color;
+  b.classList.add("show");
+  clearTimeout(bannerT);
+  bannerT=setTimeout(()=>b.classList.remove("show"),2200);
+}
+
+/* ============ FİYAT MOTORU ============ */
+let price=0, openPrice=0, dayOpen=0, live=false, started=false;
+const priceEl=$("price"), deltaEl=$("delta"), statusEl=$("status");
+
+function onCandle(open, close, vol){
+  if(!dayOpen) dayOpen=open;
+  price=close;
+  const d=close-open;
+  priceEl.textContent = "$"+close.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+  priceEl.className = d>=0?"up":"down";
+  const dp=(close-dayOpen)/dayOpen*100;
+  deltaEl.textContent=(dp>=0?"+":"")+dp.toFixed(2)+"%";
+  deltaEl.style.color=dp>=0?"#8fe06a":"#ff7a5c";
+  if(!started) return;
+  const mag=Math.abs(d);
+  if(mag<0.01) return;
+  const n=Math.max(1,Math.min(14,Math.round(mag/(price*0.000004)))); /* ~$0.25→1, sert hareket→14 */
+  const giant = mag > price*0.0004;   /* tek saniyede ~%0.04+ → dev birim */
+  if(d>0){ spawn("bull",n,false); if(giant){spawn("bull",1,true); banner("BOĞA HÜCUMU!","#8fe06a");} }
+  else   { spawn("bear",n,false); if(giant){spawn("bear",1,true); banner("İSKELET İSTİLASI!","#e8e2d4");} }
+}
+
+function connectBinance(){
+  let ok=false;
+  try{
+    const ws=new WebSocket("wss://stream.binance.com:9443/ws/btcusdt@kline_1s");
+    const to=setTimeout(()=>{if(!ok){try{ws.close()}catch(e){} startSim();}},5000);
+    ws.onmessage=e=>{
+      ok=true; clearTimeout(to);
+      if(!live){live=true;statusEl.textContent="● CANLI · BINANCE";statusEl.className="live";}
+      const k=JSON.parse(e.data).k;
+      if(k.x) onCandle(+k.o,+k.c,+k.v);           /* kapanan mum → dalga */
+      else{                                        /* ara tik → fiyat tazele */
+        price=+k.c;
+        priceEl.textContent="$"+price.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+      }
+    };
+    ws.onerror=()=>{if(!ok){clearTimeout(to);startSim();}};
+    ws.onclose=()=>{if(ok&&live){live=false;startSim();}};
+  }catch(e){startSim();}
+}
+
+let simOn=false;
+function startSim(){
+  if(simOn) return; simOn=true;
+  statusEl.textContent="◌ SİMÜLASYON MODU"; statusEl.className="sim";
+  let p = price||63200;
+  if(!dayOpen) dayOpen=p;
+  setInterval(()=>{
+    const o=p;
+    p += (Math.random()-.5)*p*0.00018 + (Math.random()<.06?(Math.random()-.5)*p*0.0009:0);
+    onCandle(o,p,1);
+  },1000);
+}
+
+/* ============ DÖNGÜ ============ */
+const clock=new THREE.Clock();
+let camAng=0;
+
+function tick(){
+  requestAnimationFrame(tick);
+  const dt=Math.min(clock.getDelta(),.05);
+  const t=clock.elapsedTime;
+
+  /* birimler */
+  for(const u of units){
+    const m=u.mesh;
+    if(u.dead){
+      u.deathT+=dt;
+      m.rotation.z += dt*3*(u.side==="bull"?1:-1);
+      if(u.deathT>.4) m.position.y -= dt*1.2;
+      if(u.deathT>1.6){scene.remove(m); u.gone=true;}
+      continue;
+    }
+    u.retarget-=dt;
+    if(!u.target||u.target.dead||u.retarget<=0){u.target=nearestEnemy(u);u.retarget=.6;}
+    if(u.target){
+      const d=m.position.distanceTo(u.target.mesh.position);
+      const dir=u.target.mesh.position.clone().sub(m.position).setY(0).normalize();
+      m.rotation.y=Math.atan2(dir.x,dir.z);
+      if(d>u.range){
+        m.position.addScaledVector(dir,u.spd*dt);
+        const sw=Math.sin(t*10+u.phase)*.5;      /* yürüme salınımı */
+        m.userData.legL.rotation.x=sw; m.userData.legR.rotation.x=-sw;
+        m.position.y=Math.abs(Math.sin(t*10+u.phase))*.05;
+      }else{
+        u.cd-=dt;
+        if(u.cd<=0){
+          u.cd = u.side==="bull"?.9:.7;
+          if(u.side==="bull") shoot(u,u.target);
+          else{ u.target.hp-=u.dmg; if(u.target.hp<=0&&!u.target.dead) kill(u.target,u); }
+        }
+      }
+    }else{
+      /* düşman yok → savaş meydanının ortasına toplan, devriye gez */
+      const rallyX = u.side==="bull" ? -7 : 7;
+      const rallyZ = Math.sin(t*.4+u.phase)*12;
+      const dir = new THREE.Vector3(rallyX-m.position.x, 0, rallyZ-m.position.z);
+      if(dir.lengthSq()>2){
+        dir.normalize();
+        m.rotation.y = Math.atan2(dir.x, dir.z);
+        m.position.addScaledVector(dir, u.spd*.7*dt);
+        const sw = Math.sin(t*10+u.phase)*.5;
+        m.userData.legL.rotation.x = sw; m.userData.legR.rotation.x = -sw;
+      }else{
+        /* meydanda bekle: kameraya doğru zafer duruşu */
+        m.rotation.y = u.side==="bull" ? Math.PI/2 : -Math.PI/2;
+        m.userData.legL.rotation.x = m.userData.legR.rotation.x = 0;
+        m.position.y = Math.abs(Math.sin(t*3+u.phase))*.12;  /* zafer zıplaması */
+      }
+    }
+    /* arena sınırı: kimse ekrandan kaybolmasın */
+    m.position.x = Math.max(-52, Math.min(52, m.position.x));
+    m.position.z = Math.max(-26, Math.min(26, m.position.z));
+  }
+  for(let i=units.length-1;i>=0;i--) if(units[i].gone) units.splice(i,1);
+
+  /* mermiler */
+  for(let i=bullets.length-1;i>=0;i--){
+    const b=bullets[i];
+    b.t+=dt; b.m.position.addScaledVector(b.dir,42*dt);
+    let hit=false;
+    for(const u of units){
+      if(u.dead||u.side===b.from.side) continue;
+      if(b.m.position.distanceToSquared(u.mesh.position.clone().setY(b.m.position.y))<1.1){
+        u.hp-=b.from.dmg;
+        if(u.hp<=0&&!u.dead) kill(u,b.from);
+        hit=true; break;
+      }
+    }
+    if(hit||b.t>1.6){scene.remove(b.m);bullets.splice(i,1);}
+  }
+
+  /* parçacıklar */
+  for(let i=parts.length-1;i>=0;i--){
+    const p=parts[i]; p.t+=dt;
+    p.vy-=14*dt;
+    p.m.position.x+=p.vx*dt; p.m.position.y+=p.vy*dt; p.m.position.z+=p.vz*dt;
+    if(p.m.position.y<0||p.t>1.4){scene.remove(p.m);parts.splice(i,1);}
+  }
+
+  /* kamera: savaşın merkezini bul, oraya süzül, herkes ekrana sığsın */
+  let cx=0, cz=0, alive=0;
+  for(const u of units){ if(!u.dead){ cx+=u.mesh.position.x; cz+=u.mesh.position.z; alive++; } }
+  if(alive){ cx/=alive; cz/=alive; }
+  let rad=10;
+  for(const u of units){
+    if(!u.dead) rad=Math.max(rad, Math.hypot(u.mesh.position.x-cx, u.mesh.position.z-cz));
+  }
+  camFocus.x += (cx-camFocus.x)*Math.min(1, dt*1.6);
+  camFocus.z += (cz-camFocus.z)*Math.min(1, dt*1.6);
+  const vf=camera.fov*Math.PI/360;                    /* yarı dikey FOV */
+  const hf=Math.atan(Math.tan(vf)*camera.aspect);     /* yarı yatay FOV */
+  const need=(rad/Math.tan(Math.min(vf,hf)))*1.15+10; /* dar kenara göre mesafe */
+  camDist += (Math.max(30, Math.min(100, need))-camDist)*Math.min(1, dt*1.3);
+  camAng += dt*.05;
+  camera.position.set(
+    camFocus.x + Math.sin(camAng)*camDist*.15,
+    camDist*.55 + Math.sin(t*.3)*1.5,
+    camFocus.z + camDist*.88
+  );
+  camera.lookAt(camFocus.x, 2, camFocus.z);
+
+  /* HUD */
+  const bn=count("bull"), sn=count("bear");
+  $("bullN").textContent=bn; $("bearN").textContent=sn;
+  $("bullK").textContent=bullKills; $("bearK").textContent=bearKills;
+  const ratio=(bn+sn)?bn/(bn+sn):.5;
+  $("warfill").style.transform=`scaleX(${ratio})`;
+
+  renderer.render(scene,camera);
+}
+
+addEventListener("resize",()=>{
+  camera.aspect=innerWidth/innerHeight;
+  camera.fov = innerWidth<innerHeight ? 62 : 50;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
+});
+
+/* ============ BAŞLAT ============ */
+connectBinance();
+tick();
+$("startBtn").addEventListener("click",()=>{
+  $("intro").remove();
+  started=true;
+  spawn("bull",8); spawn("bear",8);   /* açılış çatışması */
+  banner("SAVAŞ BAŞLADI","#ffb937");
+});
+})();
+</script>
+</body>
+</html>
