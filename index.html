@@ -78,6 +78,44 @@
     padding:12px 34px;background:var(--bull);color:#0d0f0a;border:none;cursor:pointer;font-weight:bold}
   #intro button:hover{background:#7cc551}
   #intro small{opacity:.5;font-size:10px;letter-spacing:1px}
+
+  /* ---------- oyuncu arayüzü ---------- */
+  .hidden{display:none!important}
+
+  #setup{position:fixed;inset:0;background:rgba(8,9,6,.92);display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:16px;z-index:9;text-align:center;padding:20px}
+  #setup h2{font-size:clamp(20px,4vw,32px);letter-spacing:4px}
+  #setup p{font-size:13px;opacity:.8}
+  #setup input{font:inherit;font-size:16px;padding:10px 14px;width:min(300px,80vw);
+    background:#161811;border:1px solid #4a4a3a;color:#f2eee2;text-align:center;letter-spacing:1px}
+  #setup input:focus{outline:none;border-color:var(--amber)}
+  #setup .err{color:#ff7a5c;font-size:11px;min-height:14px}
+  #setup button{font:inherit;font-size:13px;letter-spacing:2px;padding:11px 26px;
+    border:none;cursor:pointer;font-weight:bold;background:var(--bull);color:#0d0f0a}
+  .teamrow{display:flex;gap:14px;flex-wrap:wrap;justify-content:center}
+  .teambtn{font:inherit;font-size:14px;letter-spacing:2px;padding:16px 22px;cursor:pointer;
+    font-weight:bold;border:2px solid transparent;min-width:200px}
+  .teambtn.bull{background:#22301a;color:#8fe06a;border-color:#5da13f}
+  .teambtn.bull:hover{background:#2e4023}
+  .teambtn.bear{background:#26241f;color:#e8e2d4;border-color:#8a8474}
+  .teambtn.bear:hover{background:#333026}
+
+  #me{position:fixed;top:14px;left:14px;font-size:11px;letter-spacing:1px;
+    padding:6px 10px;border:1px solid rgba(255,255,255,.2);background:rgba(0,0,0,.55);
+    cursor:pointer;pointer-events:auto;z-index:5}
+  #me b{color:var(--amber)}
+
+  #predict{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:5;
+    display:flex;gap:8px;align-items:center;pointer-events:auto;
+    background:rgba(10,12,8,.85);border:1px solid rgba(255,255,255,.15);padding:10px 12px;
+    max-width:94vw;flex-wrap:wrap;justify-content:center}
+  #predict label{font-size:11px;letter-spacing:1px;opacity:.85}
+  #predict input{font:inherit;font-size:15px;width:130px;padding:7px 9px;
+    background:#161811;border:1px solid #4a4a3a;color:#f2eee2;text-align:center}
+  #predict input:focus{outline:none;border-color:var(--amber)}
+  #predict button{font:inherit;font-size:12px;letter-spacing:2px;padding:9px 16px;
+    border:none;cursor:pointer;font-weight:bold;background:var(--amber);color:#0d0f0a}
+  #predDone{font-size:12px;color:#8fe06a;letter-spacing:1px}
 </style>
 </head>
 <body>
@@ -105,6 +143,31 @@
 </div>
 <div id="status" class="sim">BAĞLANIYOR…</div>
 <div id="banner"></div>
+<div id="me" class="hidden" title="Takım değiştir"></div>
+
+<div id="setup" class="hidden">
+  <div id="stepName">
+    <h2>SAVAŞÇI KAYDI</h2>
+    <p>Kullanıcı adını seç (3–16 karakter)</p>
+    <input id="nameInput" maxlength="16" placeholder="savaşçı adın" autocomplete="off">
+    <div class="err" id="nameErr"></div>
+    <button id="nameBtn">DEVAM ➜</button>
+  </div>
+  <div id="stepTeam" class="hidden">
+    <h2>TAKIMINI SEÇ</h2>
+    <div class="teamrow">
+      <button class="teambtn bull" id="pickBull">🟢 BOĞA ORDUSU<br><small>uzaktan ateş eder</small></button>
+      <button class="teambtn bear" id="pickBear">💀 AYI İSKELETLERİ<br><small>yakın dövüşür</small></button>
+    </div>
+  </div>
+</div>
+
+<div id="predict" class="hidden">
+  <label for="predInput">🎯 EPOCH SONU BTC HEDEFİN</label>
+  <input id="predInput" type="number" step="0.01" min="1" placeholder="örn. 63450" inputmode="decimal">
+  <button id="predBtn">SAVAŞA GİR</button>
+  <span id="predDone" class="hidden"></span>
+</div>
 
 <div id="intro">
   <h1>BARBARIANS <em>BTC</em> WARS</h1>
@@ -390,6 +453,165 @@ function resolveEpoch(eid, open, close){
 }
 setInterval(epochTick, 250);
 
+/* ============ OYUNCU SİSTEMİ ============ */
+/* Misafir modu: kimlik localStorage'da tutulur. Firebase yapılandırması
+   eklendiğinde aynı akış Google girişi + Firestore senkronuna bağlanır. */
+const me = {
+  uid: "guest",
+  name: localStorage.getItem("bbw_name") || "",
+  team: localStorage.getItem("bbw_team") || "",
+  pts: +(localStorage.getItem("bbw_pts") || 0)
+};
+let myPred = null;                 /* {eid, target} */
+const heroesDesired = new Map();   /* uid -> {uid, side, name, target, eid} */
+
+const esc = s => String(s).replace(/[&<>"']/g, c =>
+  ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+function makeLabel(name, target, side){
+  const c = document.createElement("canvas");
+  c.width = 512; c.height = 192;
+  const g = c.getContext("2d");
+  g.fillStyle = "rgba(8,9,6,.74)";
+  g.fillRect(6, 6, 500, 180);
+  g.strokeStyle = side==="bull" ? "#5da13f" : "#8a8474";
+  g.lineWidth = 6;
+  g.strokeRect(6, 6, 500, 180);
+  g.textAlign = "center";
+  g.font = "bold 52px 'Courier New', monospace";
+  g.fillStyle = side==="bull" ? "#8fe06a" : "#e8e2d4";
+  g.fillText(name, 256, 78, 480);
+  g.font = "bold 44px 'Courier New', monospace";
+  g.fillStyle = "#ffb937";
+  g.fillText("🎯 $" + (+target).toLocaleString("en-US"), 256, 152, 480);
+  const tex = new THREE.CanvasTexture(c);
+  tex.minFilter = THREE.LinearFilter;
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({map:tex, depthTest:false, transparent:true}));
+  sp.scale.set(5.6, 2.1, 1);
+  sp.position.y = 2.9;
+  sp.renderOrder = 99;
+  return sp;
+}
+
+function heroAlive(uid){
+  return units.some(u => u.hero && u.hero.uid===uid && !u.dead);
+}
+function spawnHeroUnit(d){
+  const mesh = d.side==="bull" ? makeBull() : makeBear();
+  const x = d.side==="bull" ? -46-Math.random()*8 : 46+Math.random()*8;
+  mesh.position.set(x, 0, (Math.random()-.5)*40);
+  mesh.rotation.y = d.side==="bull" ? Math.PI/2 : -Math.PI/2;
+  mesh.scale.setScalar(1.5);
+  mesh.add(makeLabel(d.name, d.target, d.side));
+  scene.add(mesh);
+  units.push({
+    id:nextId++, side:d.side, mesh, giant:false, hero:d,
+    hp:150, dmg:13,
+    spd:(d.side==="bull"?4.2:5.4)*.95,
+    range: d.side==="bull" ? 22 : 2.9,
+    cd:0, target:null, retarget:0, dead:false, phase:Math.random()*7
+  });
+}
+/* kahraman sahada değilse (öldü/yeni tahmin) tekrar doğar */
+setInterval(()=>{
+  if(!started) return;
+  for(const d of heroesDesired.values()){
+    if(d.eid!==curEpoch) continue;
+    if(count(d.side)>=MAXSIDE) continue;
+    if(!heroAlive(d.uid)) spawnHeroUnit(d);
+  }
+}, 1500);
+
+function feedText(html){
+  const d = document.createElement("div");
+  d.innerHTML = html;
+  feedBox.appendChild(d);
+  while(feedBox.children.length>5) feedBox.firstChild.remove();
+  setTimeout(()=>d.remove(), 5200);
+}
+
+/* ---- arayüz akışı ---- */
+function showSetup(step){
+  $("setup").classList.remove("hidden");
+  $("stepName").classList.toggle("hidden", step!=="name");
+  $("stepTeam").classList.toggle("hidden", step!=="team");
+  if(step==="name") setTimeout(()=>$("nameInput").focus(), 50);
+}
+function hideSetup(){ $("setup").classList.add("hidden"); }
+function updateMe(){
+  const el = $("me");
+  if(!me.name){ el.classList.add("hidden"); return; }
+  el.classList.remove("hidden");
+  const icon = me.team==="bull" ? "🟢" : me.team==="bear" ? "💀" : "";
+  el.innerHTML = `${icon} <b>${esc(me.name)}</b> · ${me.pts} puan`;
+}
+function resetPredictUI(){
+  if(!started || !me.team) return;
+  $("predict").classList.remove("hidden");
+  $("predInput").classList.remove("hidden");
+  $("predBtn").classList.remove("hidden");
+  $("predDone").classList.add("hidden");
+  if(price) $("predInput").value = price.toFixed(2);
+}
+function submitPred(){
+  const t = parseFloat($("predInput").value);
+  if(!(t>0) || !me.team) return;
+  myPred = {eid:curEpoch, target:t};
+  heroesDesired.set(me.uid, {uid:me.uid, side:me.team, name:me.name, target:t, eid:curEpoch});
+  $("predInput").classList.add("hidden");
+  $("predBtn").classList.add("hidden");
+  const pd = $("predDone");
+  pd.classList.remove("hidden");
+  pd.textContent = "⚔ $" + t.toLocaleString("en-US") + " hedefiyle sahadasın!";
+}
+$("predBtn").addEventListener("click", submitPred);
+$("predInput").addEventListener("keydown", e=>{ if(e.key==="Enter") submitPred(); });
+
+$("nameBtn").addEventListener("click", ()=>{
+  const n = $("nameInput").value.trim();
+  if(!/^[\wçğıöşüÇĞİÖŞÜ]{3,16}$/.test(n)){
+    $("nameErr").textContent = "3–16 karakter: harf, rakam, alt çizgi.";
+    return;
+  }
+  me.name = n;
+  localStorage.setItem("bbw_name", n);
+  showSetup("team");
+});
+$("nameInput").addEventListener("keydown", e=>{ if(e.key==="Enter") $("nameBtn").click(); });
+
+function pickTeam(t){
+  me.team = t;
+  localStorage.setItem("bbw_team", t);
+  hideSetup(); updateMe(); resetPredictUI();
+  banner(t==="bull" ? "BOĞA ORDUSUNA KATILDIN" : "AYI İSKELETLERİNE KATILDIN",
+         t==="bull" ? "#8fe06a" : "#e8e2d4");
+}
+$("pickBull").addEventListener("click", ()=>pickTeam("bull"));
+$("pickBear").addEventListener("click", ()=>pickTeam("bear"));
+$("me").addEventListener("click", ()=>showSetup("team"));   /* takım değiştir */
+
+/* ---- epoch olayları ---- */
+addEventListener("epoch-start", e=>{
+  for(const [uid,d] of [...heroesDesired]) if(d.eid!==e.detail.eid) heroesDesired.delete(uid);
+  for(const u of units) if(u.hero && u.hero.eid!==e.detail.eid && !u.dead){ u.dead=true; u.deathT=0; }
+  resetPredictUI();
+});
+addEventListener("epoch-resolved", e=>{
+  const {eid, close, winner} = e.detail;
+  if(myPred && myPred.eid===eid && me.team){
+    let gained = 0;
+    if(winner===me.team) gained += 10;
+    if(close && Math.abs(myPred.target-close) <= close*0.0005) gained += 5;  /* isabet bonusu */
+    if(gained){
+      me.pts += gained;
+      localStorage.setItem("bbw_pts", me.pts);
+      feedText(`<span class="${me.team==="bull"?"b":"s"}">${esc(me.name)}</span> +${gained} puan 🏆`);
+    }
+    myPred = null;
+    updateMe();
+  }
+});
+
 let simOn=false;
 function startSim(){
   if(simOn) return; simOn=true;
@@ -537,6 +759,9 @@ $("startBtn").addEventListener("click",()=>{
   started=true;
   spawn("bull",8); spawn("bear",8);   /* açılış çatışması */
   banner("SAVAŞ BAŞLADI","#ffb937");
+  if(!me.name)      showSetup("name");
+  else if(!me.team) showSetup("team");
+  else { updateMe(); resetPredictUI(); }
 });
 })();
 </script>
