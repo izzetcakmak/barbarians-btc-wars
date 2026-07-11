@@ -136,20 +136,40 @@
   #lbPanel .b{color:#8fe06a} #lbPanel .s{color:#ded8c8}
   #lbPanel button{font:inherit;font-size:11px;letter-spacing:2px;margin-top:14px;
     padding:8px 18px;border:none;cursor:pointer;background:#3a3a30;color:#f2eee2}
+
+  /* ---------- dil / marka ---------- */
+  #langBtn{position:fixed;top:44px;right:14px;z-index:12;font-size:11px;
+    letter-spacing:1px;padding:5px 9px;border:1px solid rgba(255,255,255,.25);
+    background:rgba(0,0,0,.6);cursor:pointer;pointer-events:auto;user-select:none}
+  #langBtn span{opacity:.45;padding:0 3px}
+  #langBtn span.on{opacity:1;color:var(--amber);font-weight:bold}
+
+  #credit{position:fixed;bottom:10px;right:12px;z-index:5;text-align:right;
+    font-size:10px;letter-spacing:.5px;line-height:1.7;opacity:.75;
+    text-shadow:0 1px 4px #000;pointer-events:none}
+  #credit b{color:var(--amber);font-weight:bold}
+  #credit .f2ptag{color:#8fe06a;font-weight:bold}
+
+  .f2p{display:inline-block;margin-top:6px;padding:5px 14px;font-size:11px;
+    letter-spacing:2px;font-weight:bold;color:#0d0f0a;background:#8fe06a;
+    transform:skewX(-8deg)}
+  #introCredit{font-size:13px;letter-spacing:1px;color:var(--amber);
+    text-shadow:0 1px 6px #000;margin-top:2px}
+  #introContact{opacity:.6;font-size:11px;letter-spacing:1px}
 </style>
 </head>
 <body>
 <div id="hud">
   <div id="ticker">
     <div id="price">$--,---.--</div>
-    <div id="sub">BTC/USD &nbsp;·&nbsp; <span id="delta">0.00%</span> &nbsp;·&nbsp; 1sn mum = 1 saldırı dalgası</div>
+    <div id="sub">BTC/USD &nbsp;·&nbsp; <span id="delta">0.00%</span> &nbsp;·&nbsp; <span id="subTail">1s candle = 1 attack wave</span></div>
   </div>
   <div id="armies">
     <div class="army" id="bullBox">
-      <h4>BOĞA ORDUSU</h4><div class="n" id="bullN">0</div><div class="k"><span id="bullK">0</span> öldürme</div>
+      <h4 id="bullTitle">BULL ARMY</h4><div class="n" id="bullN">0</div><div class="k"><span id="bullK">0</span> <span class="kl">kills</span></div>
     </div>
     <div class="army" id="bearBox">
-      <h4>AYI İSKELETLERİ</h4><div class="n" id="bearN">0</div><div class="k"><span id="bearK">0</span> öldürme</div>
+      <h4 id="bearTitle">BEAR SKELETONS</h4><div class="n" id="bearN">0</div><div class="k"><span id="bearK">0</span> <span class="kl">kills</span></div>
     </div>
   </div>
   <div id="warbar"><div id="warfill"></div></div>
@@ -161,56 +181,61 @@
   <div id="spacer"></div>
   <div id="feed"></div>
 </div>
-<div id="status" class="sim">BAĞLANIYOR…</div>
+<div id="status" class="sim">CONNECTING…</div>
 <div id="banner"></div>
-<div id="me" class="hidden" title="Takım değiştir"></div>
+<div id="me" class="hidden"></div>
+<div id="langBtn"><span id="langEN" class="on">EN</span>|<span id="langTR">TR</span></div>
+<div id="credit"></div>
 
 <div id="setup" class="hidden">
   <div id="stepName">
-    <h2>SAVAŞÇI KAYDI</h2>
-    <p>Kullanıcı adını seç (3–16 karakter)</p>
-    <input id="nameInput" maxlength="16" placeholder="savaşçı adın" autocomplete="off">
+    <h2 id="regTitle">WARRIOR REGISTRATION</h2>
+    <p id="regSub">Pick your username (3–16 characters)</p>
+    <input id="nameInput" maxlength="16" placeholder="your warrior name" autocomplete="off">
     <div class="err" id="nameErr"></div>
-    <button id="nameBtn">DEVAM ➜</button>
+    <button id="nameBtn">CONTINUE ➜</button>
   </div>
   <div id="stepTeam" class="hidden">
-    <h2>TAKIMINI SEÇ</h2>
+    <h2 id="teamTitle">CHOOSE YOUR ARMY</h2>
     <div class="teamrow">
-      <button class="teambtn bull" id="pickBull">🟢 BOĞA ORDUSU<br><small>uzaktan ateş eder</small></button>
-      <button class="teambtn bear" id="pickBear">💀 AYI İSKELETLERİ<br><small>yakın dövüşür</small></button>
+      <button class="teambtn bull" id="pickBull"></button>
+      <button class="teambtn bear" id="pickBear"></button>
     </div>
   </div>
 </div>
 
 <div id="predict" class="hidden">
-  <label for="predInput">🎯 SONRAKİ EPOCH BTC HEDEFİN</label>
-  <input id="predInput" type="number" step="0.01" min="1" placeholder="örn. 63450" inputmode="decimal">
-  <button id="predBtn">SAVAŞA GİR</button>
+  <label for="predInput" id="predLabel">🎯 YOUR BTC TARGET FOR NEXT EPOCH</label>
+  <input id="predInput" type="number" step="0.01" min="1" placeholder="e.g. 63450" inputmode="decimal">
+  <button id="predBtn">JOIN THE BATTLE</button>
   <span id="predDone" class="hidden"></span>
 </div>
 
-<div id="lbBtn" class="hidden">🏆 LİDERLER</div>
+<div id="lbBtn" class="hidden">🏆 LEADERS</div>
 <div id="lbPanel" class="hidden">
-  <h2>🏆 LİDERLİK TABLOSU</h2>
+  <h2 id="lbTitle">🏆 LEADERBOARD</h2>
   <ol id="lbList"></ol>
-  <button id="lbClose">KAPAT</button>
+  <button id="lbClose">CLOSE</button>
 </div>
 
 <script src="firebase-config.js"></script>
 
 <div id="intro">
   <h1>BARBARIANS <em>BTC</em> WARS</h1>
-  <p>Her saniyelik Bitcoin mumu bir saldırı dalgasıdır.<br>
-     Yeşil mum → oyuncak askerler cepheye koşar.<br>
-     Kırmızı mum → iskeletler mezardan kalkar.<br>
-     Fiyat ne kadar sert hareket ederse dalga o kadar büyük olur.</p>
+  <div class="f2p" id="introF2P">FREE TO PLAY (F2P)</div>
+  <div id="introCredit">Developed by İzzet ÇAKMAK on Robinhood Chain ⛓</div>
+  <p id="introP">Every one-second Bitcoin candle is an attack wave.<br>
+     Green candle → toy soldiers charge the front line.<br>
+     Red candle → skeletons rise from the grave.<br>
+     The harder the price moves, the bigger the wave.</p>
   <div class="introBtns">
-    <button id="walletBtn" class="hidden">🦊 CÜZDAN İLE GİRİŞ</button>
-    <button id="googleBtn" class="hidden">🔑 GOOGLE İLE GİRİŞ</button>
-    <button id="startBtn">MİSAFİR OLARAK OYNA</button>
+    <button id="walletBtn" class="hidden">🦊 CONNECT WALLET</button>
+    <button id="googleBtn" class="hidden">🔑 SIGN IN WITH GOOGLE</button>
+    <button id="startBtn">PLAY AS GUEST</button>
   </div>
   <div class="err" id="authErr"></div>
-  <small>Canlı veri: Binance BTC/USDT · bağlantı yoksa simülasyon devreye girer</small>
+  <small id="introSmall">Live data: Binance BTC/USDT · falls back to simulation when offline</small>
+  <div id="introContact">Contact: info@barbariansbtcwars.xyz</div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -365,10 +390,150 @@ function shoot(u, target){
 /* ============ HUD ============ */
 const $=id=>document.getElementById(id);
 const feedBox=$("feed");
+
+/* ============ DİL (EN varsayılan / TR) ============ */
+const I18N = {
+  en: {
+    title: "BARBARIANS BTC WARS — live Bitcoin battle",
+    subTail: "1s candle = 1 attack wave",
+    bullArmy: "BULL ARMY", bearArmy: "BEAR SKELETONS", kills: "kills",
+    connecting: "CONNECTING…", live: "● LIVE · BINANCE", sim: "◌ SIMULATION MODE",
+    introP: "Every one-second Bitcoin candle is an attack wave.<br>Green candle → toy soldiers charge the front line.<br>Red candle → skeletons rise from the grave.<br>The harder the price moves, the bigger the wave.",
+    walletBtn: "🦊 CONNECT WALLET", googleBtn: "🔑 SIGN IN WITH GOOGLE",
+    googleContinue: n => "🔑 CONTINUE (" + n + ")",
+    guestBtn: "PLAY AS GUEST",
+    introSmall: "Live data: Binance BTC/USDT · falls back to simulation when offline",
+    f2p: "FREE TO PLAY (F2P)",
+    credit: "Developed by <b>İzzet ÇAKMAK</b> on Robinhood Chain",
+    contact: "Contact: info@barbariansbtcwars.xyz",
+    regTitle: "WARRIOR REGISTRATION", regSub: "Pick your username (3–16 characters)",
+    namePh: "your warrior name", continueBtn: "CONTINUE ➜",
+    teamTitle: "CHOOSE YOUR ARMY",
+    bullPick: "🟢 BULL ARMY<br><small>fires from range</small>",
+    bearPick: "💀 BEAR SKELETONS<br><small>melee fighters</small>",
+    predLabel: "🎯 YOUR BTC TARGET FOR NEXT EPOCH", predPh: "e.g. 63450",
+    joinBattle: "JOIN THE BATTLE", confirmWait: "CONFIRM…",
+    predDone: p => "⚔ You're in the next epoch with a $" + p + " target!",
+    lbBtn: "🏆 LEADERS", lbTitle: "🏆 LEADERBOARD", close: "CLOSE",
+    loading: "loading…", noPlayers: "no players yet",
+    lbNote: "⛓ chain points are computed from the last ~20h of records",
+    points: "pts", switchTeam: "Switch team",
+    warStarted: "THE WAR HAS BEGUN", bullCharge: "BULL CHARGE!",
+    skeletonInvasion: "SKELETON INVASION!",
+    bullsWon: "🏆 BULLS WIN THE EPOCH", bearsWon: "🏆 BEARS WIN THE EPOCH",
+    epochTie: "EPOCH TIED",
+    joinedBull: "YOU JOINED THE BULL ARMY", joinedBear: "YOU JOINED THE BEAR SKELETONS",
+    walletWait: "WAITING FOR WALLET CONFIRMATION…", txRejected: "TX REJECTED",
+    unitBull: "BULL", unitBear: "SKELETON",
+    nameRule: "3–16 characters: letters, digits, underscore.",
+    nameTooLong: "Too long for the chain — make it shorter.",
+    checking: "checking…",
+    nameTakenDb: "That username is taken, try another.",
+    connErr: "Connection error, try again.",
+    nameTakenChain: "That username is taken on-chain, try another.",
+    nameRejectedChain: "The chain rejected this name: use letters, digits or _.",
+    predFailed: r => "⛓ prediction failed: " + r, txRejectedShort: "tx rejected",
+    noWallet: "No wallet found — install MetaMask (metamask.io) and retry.",
+    walletLoginFailed: "Wallet sign-in failed: ",
+    switchFailed: "could not switch to Robinhood Chain",
+    accountChanged: "wallet account changed — refresh the page and sign in again",
+    loginFailed: "Sign-in failed: "
+  },
+  tr: {
+    title: "BARBARIANS BTC WARS — canlı BTC savaşı",
+    subTail: "1sn mum = 1 saldırı dalgası",
+    bullArmy: "BOĞA ORDUSU", bearArmy: "AYI İSKELETLERİ", kills: "öldürme",
+    connecting: "BAĞLANIYOR…", live: "● CANLI · BINANCE", sim: "◌ SİMÜLASYON MODU",
+    introP: "Her saniyelik Bitcoin mumu bir saldırı dalgasıdır.<br>Yeşil mum → oyuncak askerler cepheye koşar.<br>Kırmızı mum → iskeletler mezardan kalkar.<br>Fiyat ne kadar sert hareket ederse dalga o kadar büyük olur.",
+    walletBtn: "🦊 CÜZDAN İLE GİRİŞ", googleBtn: "🔑 GOOGLE İLE GİRİŞ",
+    googleContinue: n => "🔑 DEVAM ET (" + n + ")",
+    guestBtn: "MİSAFİR OLARAK OYNA",
+    introSmall: "Canlı veri: Binance BTC/USDT · bağlantı yoksa simülasyon devreye girer",
+    f2p: "FREE TO PLAY (F2P) SÜRÜMÜ",
+    credit: "Robinhood Chain üzerinde <b>İzzet ÇAKMAK</b> tarafından geliştirilmiştir",
+    contact: "İletişim: info@barbariansbtcwars.xyz",
+    regTitle: "SAVAŞÇI KAYDI", regSub: "Kullanıcı adını seç (3–16 karakter)",
+    namePh: "savaşçı adın", continueBtn: "DEVAM ➜",
+    teamTitle: "TAKIMINI SEÇ",
+    bullPick: "🟢 BOĞA ORDUSU<br><small>uzaktan ateş eder</small>",
+    bearPick: "💀 AYI İSKELETLERİ<br><small>yakın dövüşür</small>",
+    predLabel: "🎯 SONRAKİ EPOCH BTC HEDEFİN", predPh: "örn. 63450",
+    joinBattle: "SAVAŞA GİR", confirmWait: "ONAY…",
+    predDone: p => "⚔ $" + p + " hedefiyle sonraki epoch'tasın!",
+    lbBtn: "🏆 LİDERLER", lbTitle: "🏆 LİDERLİK TABLOSU", close: "KAPAT",
+    loading: "yükleniyor…", noPlayers: "henüz oyuncu yok",
+    lbNote: "⛓ zincir puanları son ~20 saatin kayıtlarından hesaplanır",
+    points: "puan", switchTeam: "Takım değiştir",
+    warStarted: "SAVAŞ BAŞLADI", bullCharge: "BOĞA HÜCUMU!",
+    skeletonInvasion: "İSKELET İSTİLASI!",
+    bullsWon: "🏆 BOĞALAR EPOCH'U KAZANDI", bearsWon: "🏆 AYILAR EPOCH'U KAZANDI",
+    epochTie: "EPOCH BERABERE",
+    joinedBull: "BOĞA ORDUSUNA KATILDIN", joinedBear: "AYI İSKELETLERİNE KATILDIN",
+    walletWait: "CÜZDAN ONAYI BEKLENİYOR…", txRejected: "TX REDDEDİLDİ",
+    unitBull: "BOĞA", unitBear: "İSKELET",
+    nameRule: "3–16 karakter: harf, rakam, alt çizgi.",
+    nameTooLong: "Bu ad zincir için çok uzun, kısalt.",
+    checking: "kontrol ediliyor…",
+    nameTakenDb: "Bu kullanıcı adı alınmış, başka bir tane dene.",
+    connErr: "Bağlantı hatası, tekrar dene.",
+    nameTakenChain: "Bu kullanıcı adı zincirde alınmış, başka bir tane dene.",
+    nameRejectedChain: "Zincir bu adı kabul etmedi: harf, rakam, _ ve Türkçe karakter kullan.",
+    predFailed: r => "⛓ tahmin gönderilemedi: " + r, txRejectedShort: "tx reddedildi",
+    noWallet: "Cüzdan bulunamadı — MetaMask (metamask.io) kurup tekrar dene.",
+    walletLoginFailed: "Cüzdan girişi başarısız: ",
+    switchFailed: "Robinhood Chain'e geçilemedi",
+    accountChanged: "cüzdanda hesap değişti — sayfayı yenileyip tekrar gir",
+    loginFailed: "Giriş başarısız: "
+  }
+};
+let lang = localStorage.getItem("bbw_lang") === "tr" ? "tr" : "en";   /* varsayılan EN */
+const T = k => I18N[lang][k];
+let statusKey = "connecting";
+function setStatus(key){
+  statusKey = key;
+  const el = $("status");
+  el.textContent = T(key);
+  el.className = key==="live" ? "live" : "sim";
+}
+function applyLang(){
+  document.documentElement.lang = lang;
+  document.title = T("title");
+  const set = (id, key, html) => { const el=$(id); if(el) el[html?"innerHTML":"textContent"]=T(key); };
+  set("subTail","subTail"); set("bullTitle","bullArmy"); set("bearTitle","bearArmy");
+  for(const el of document.querySelectorAll(".kl")) el.textContent = T("kills");
+  setStatus(statusKey);
+  set("introP","introP",true); set("walletBtn","walletBtn"); set("startBtn","guestBtn");
+  set("introSmall","introSmall"); set("introF2P","f2p"); set("introContact","contact");
+  const ic=$("introCredit"); if(ic) ic.innerHTML = T("credit").replace(/<\/?b>/g,"") + " ⛓";
+  const gb=$("googleBtn");
+  if(gb){
+    let u=null; try{ u=fbUser; }catch(_){}          /* ilk çağrıda henüz tanımsız (TDZ) */
+    gb.textContent = u ? T("googleContinue")(u.displayName||"Google") : T("googleBtn");
+  }
+  set("regTitle","regTitle"); set("regSub","regSub"); set("nameBtn","continueBtn");
+  const ni=$("nameInput"); if(ni) ni.placeholder = T("namePh");
+  set("teamTitle","teamTitle"); set("pickBull","bullPick",true); set("pickBear","bearPick",true);
+  set("predLabel","predLabel"); set("lbBtn","lbBtn"); set("lbTitle","lbTitle"); set("lbClose","close");
+  const pi=$("predInput"); if(pi) pi.placeholder = T("predPh");
+  const pb=$("predBtn"); if(pb && !pb.disabled) pb.textContent = T("joinBattle");
+  $("credit").innerHTML = T("credit") + " · <span class='f2ptag'>" + T("f2p") + "</span><br>" + T("contact");
+  const meEl=$("me"); if(meEl) meEl.title = T("switchTeam");
+  $("langEN").classList.toggle("on", lang==="en");
+  $("langTR").classList.toggle("on", lang==="tr");
+  try{ if(me && me.name) updateMe(); }catch(_){}   /* ilk çağrıda henüz tanımsız (TDZ) */
+}
+function setLangChoice(l){
+  lang = l;
+  localStorage.setItem("bbw_lang", l);
+  applyLang();
+}
+$("langBtn").addEventListener("click", ()=>setLangChoice(lang==="en" ? "tr" : "en"));
+applyLang();
 function feed(k,v){
   const d=document.createElement("div");
-  const kn = k.side==="bull"?`<span class="b">BOĞA#${k.id}</span>`:`<span class="s">İSKELET#${k.id}</span>`;
-  const vn = v.side==="bull"?`<span class="b">BOĞA#${v.id}</span>`:`<span class="s">İSKELET#${v.id}</span>`;
+  const un = u => u.side==="bull" ? `<span class="b">${T("unitBull")}#${u.id}</span>`
+                                  : `<span class="s">${T("unitBear")}#${u.id}</span>`;
+  const kn = un(k), vn = un(v);
   d.innerHTML = `${kn} <span class="x">☠</span> ${vn}`;
   feedBox.appendChild(d);
   while(feedBox.children.length>5) feedBox.firstChild.remove();
@@ -400,8 +565,8 @@ function onCandle(open, close, vol){
   if(mag<0.01) return;
   const n=Math.max(1,Math.min(14,Math.round(mag/(price*0.000004)))); /* ~$0.25→1, sert hareket→14 */
   const giant = mag > price*0.0004;   /* tek saniyede ~%0.04+ → dev birim */
-  if(d>0){ spawn("bull",n,false); if(giant){spawn("bull",1,true); banner("BOĞA HÜCUMU!","#8fe06a");} }
-  else   { spawn("bear",n,false); if(giant){spawn("bear",1,true); banner("İSKELET İSTİLASI!","#e8e2d4");} }
+  if(d>0){ spawn("bull",n,false); if(giant){spawn("bull",1,true); banner(T("bullCharge"),"#8fe06a");} }
+  else   { spawn("bear",n,false); if(giant){spawn("bear",1,true); banner(T("skeletonInvasion"),"#e8e2d4");} }
 }
 
 function connectBinance(){
@@ -411,7 +576,7 @@ function connectBinance(){
     const to=setTimeout(()=>{if(!ok){try{ws.close()}catch(e){} startSim();}},5000);
     ws.onmessage=e=>{
       ok=true; clearTimeout(to);
-      if(!live){live=true;statusEl.textContent="● CANLI · BINANCE";statusEl.className="live";}
+      if(!live){live=true;setStatus("live");}
       const k=JSON.parse(e.data).k;
       if(k.x) onCandle(+k.o,+k.c,+k.v);           /* kapanan mum → dalga */
       else{                                        /* ara tik → fiyat tazele */
@@ -474,12 +639,12 @@ function resolveEpoch(eid, open, close){
   if(winner){
     epochScores[winner]++;
     if(started){
-      banner(winner==="bull" ? "🏆 BOĞALAR EPOCH'U KAZANDI" : "🏆 AYILAR EPOCH'U KAZANDI",
+      banner(winner==="bull" ? T("bullsWon") : T("bearsWon"),
              winner==="bull" ? "#8fe06a" : "#e8e2d4");
       spawn(winner, 6, false);          /* zafer dalgası */
     }
   }else if(started){
-    banner("EPOCH BERABERE", "#ffb937");
+    banner(T("epochTie"), "#ffb937");
   }
   $("scoreBull").textContent = epochScores.bull;
   $("scoreBear").textContent = epochScores.bear;
@@ -578,7 +743,7 @@ function updateMe(){
   if(!me.name){ el.classList.add("hidden"); return; }
   el.classList.remove("hidden");
   const icon = me.team==="bull" ? "🟢" : me.team==="bear" ? "💀" : "";
-  el.innerHTML = `${icon} <b>${esc(me.name)}</b> · ${me.pts} puan`;
+  el.innerHTML = `${icon} <b>${esc(me.name)}</b> · ${me.pts} ${T("points")}`;
 }
 function resetPredictUI(){
   if(!started || !me.team) return;
@@ -596,7 +761,7 @@ async function submitPred(){
   let targetEid = curEpoch + 1;
   if(mode==="chain"){                     /* tahmin zincire yazılır */
     const btn = $("predBtn");
-    btn.disabled = true; btn.textContent = "ONAY…";
+    btn.disabled = true; btn.textContent = T("confirmWait");
     try{
       const c = await chainRead();
       targetEid = Number(await c.currentEpoch()) + 1;   /* zincir saati esas */
@@ -604,11 +769,11 @@ async function submitPred(){
       const tx = await signed.predict(Math.round(t*100), targetEid);
       await tx.wait();
     }catch(e){
-      btn.disabled = false; btn.textContent = "SAVAŞA GİR";
-      feedText('<span class="x">⛓ tahmin gönderilemedi: '+esc(chainErrName(e)||"tx reddedildi")+'</span>');
+      btn.disabled = false; btn.textContent = T("joinBattle");
+      feedText('<span class="x">'+esc(T("predFailed")(chainErrName(e)||T("txRejectedShort")))+'</span>');
       return;
     }
-    btn.disabled = false; btn.textContent = "SAVAŞA GİR";
+    btn.disabled = false; btn.textContent = T("joinBattle");
   }
   myPreds.set(targetEid, t);
   heroesDesired.set(me.uid, {uid:me.uid, side:me.team, name:me.name, target:t, eid:targetEid});
@@ -620,7 +785,7 @@ async function submitPred(){
   $("predBtn").classList.add("hidden");
   const pd = $("predDone");
   pd.classList.remove("hidden");
-  pd.textContent = "⚔ $" + t.toLocaleString("en-US") + " hedefiyle sonraki epoch'tasın!";
+  pd.textContent = T("predDone")(t.toLocaleString("en-US"));
 }
 $("predBtn").addEventListener("click", submitPred);
 $("predInput").addEventListener("keydown", e=>{ if(e.key==="Enter") submitPred(); });
@@ -628,18 +793,18 @@ $("predInput").addEventListener("keydown", e=>{ if(e.key==="Enter") submitPred()
 $("nameBtn").addEventListener("click", async ()=>{
   const n = $("nameInput").value.trim();
   if(!/^[\wçğıöşüÇĞİÖŞÜ]{3,16}$/.test(n)){
-    $("nameErr").textContent = "3–16 karakter: harf, rakam, alt çizgi.";
+    $("nameErr").textContent = T("nameRule");
     return;
   }
   if(mode==="chain"){
     if(new TextEncoder().encode(n).length > 32){
-      $("nameErr").textContent = "Bu ad zincir için çok uzun, kısalt.";
+      $("nameErr").textContent = T("nameTooLong");
       return;
     }
     /* zincirde rezervasyon takım seçiminde register() tx'iyle yapılır */
   }
   if(mode==="google" && db && fbUser){  /* kullanıcı adını veritabanında rezerve et */
-    $("nameErr").textContent = "kontrol ediliyor…";
+    $("nameErr").textContent = T("checking");
     try{
       const key = n.toLowerCase();
       const res = await db.ref("usernames/"+key).transaction(cur =>
@@ -650,9 +815,7 @@ $("nameBtn").addEventListener("click", async ()=>{
         {name:n, nameLower:key, points:me.pts||0, team:me.team||"", updatedAt:Date.now()});
       $("nameErr").textContent = "";
     }catch(e){
-      $("nameErr").textContent = e.message==="taken"
-        ? "Bu kullanıcı adı alınmış, başka bir tane dene."
-        : "Bağlantı hatası, tekrar dene.";
+      $("nameErr").textContent = e.message==="taken" ? T("nameTakenDb") : T("connErr");
       return;
     }
   }
@@ -671,12 +834,12 @@ async function pickTeam(t){
       const en = chainErrName(e);
       if(en==="NameTaken"){
         showSetup("name");
-        $("nameErr").textContent = "Bu kullanıcı adı zincirde alınmış, başka bir tane dene.";
+        $("nameErr").textContent = T("nameTakenChain");
       }else if(en==="InvalidName"){
         showSetup("name");
-        $("nameErr").textContent = "Zincir bu adı kabul etmedi: harf, rakam, _ ve Türkçe karakter kullan.";
+        $("nameErr").textContent = T("nameRejectedChain");
       }else{
-        banner("TX REDDEDİLDİ","#ff7a5c");
+        banner(T("txRejected"),"#ff7a5c");
       }
       return;
     }
@@ -687,7 +850,7 @@ async function pickTeam(t){
     db.ref("players/"+me.uid).update({team:t})
       .catch(e=>console.warn("takım yazılamadı", e));
   hideSetup(); updateMe(); resetPredictUI();
-  banner(t==="bull" ? "BOĞA ORDUSUNA KATILDIN" : "AYI İSKELETLERİNE KATILDIN",
+  banner(t==="bull" ? T("joinedBull") : T("joinedBear"),
          t==="bull" ? "#8fe06a" : "#e8e2d4");
 }
 $("pickBull").addEventListener("click", ()=>pickTeam("bull"));
@@ -718,7 +881,7 @@ addEventListener("epoch-resolved", e=>{
           points: firebase.database.ServerValue.increment(gained),
           wins:   firebase.database.ServerValue.increment(winner===me.team ? 1 : 0)
         }).catch(err=>console.warn("puan yazılamadı", err));
-      feedText(`<span class="${me.team==="bull"?"b":"s"}">${esc(me.name)}</span> +${gained} puan 🏆`);
+      feedText(`<span class="${me.team==="bull"?"b":"s"}">${esc(me.name)}</span> +${gained} ${T("points")} 🏆`);
     }
     myPreds.delete(eid);
     updateMe();
@@ -757,7 +920,7 @@ async function initFirebase(){
     $("googleBtn").classList.remove("hidden");
     firebase.auth().onAuthStateChanged(u=>{
       fbUser=u;
-      if(u && $("googleBtn")) $("googleBtn").textContent = "🔑 DEVAM ET (" + (u.displayName||"Google") + ")";
+      if(u && $("googleBtn")) $("googleBtn").textContent = T("googleContinue")(u.displayName||"Google");
     });
   }catch(e){ console.warn("Firebase yüklenemedi, misafir modu:", e); }
 }
@@ -787,7 +950,7 @@ async function googleLogin(){
   }catch(e){
     if(mode==="google") mode="guest";
     const el=$("authErr");
-    if(el) el.textContent = "Giriş başarısız: " + (e.code || e.message || e);
+    if(el) el.textContent = T("loginFailed") + (e.code || e.message || e);
   }
 }
 
@@ -820,7 +983,8 @@ function subscribePreds(){
 /* liderlik tablosu: zincir (event'lerden) + Google (RTDB) birleşik */
 $("lbBtn").addEventListener("click", async ()=>{
   const list=$("lbList");
-  list.innerHTML="<li>yükleniyor…</li>";
+  list.textContent="";
+  const li0=document.createElement("li"); li0.textContent=T("loading"); list.appendChild(li0);
   $("lbPanel").classList.remove("hidden");
   const rows=[];
   try{ rows.push(...await chainLeaderboard()); }catch(e){}
@@ -840,14 +1004,15 @@ $("lbBtn").addEventListener("click", async ()=>{
   list.innerHTML="";
   for(const r of rows.slice(0,10)){
     const li=document.createElement("li");
-    li.innerHTML = `<span class="${r.team==="bear"?"s":"b"}">${esc(r.name)}</span> — ${Number(r.pts)||0} puan ${r.src==="🔑"?"🔑":"⛓"}`;
+    li.innerHTML = `<span class="${r.team==="bear"?"s":"b"}">${esc(r.name)}</span> — ${Number(r.pts)||0} ${T("points")} ${r.src==="🔑"?"🔑":"⛓"}`;
     list.appendChild(li);
   }
-  if(!rows.length) list.innerHTML="<li>henüz oyuncu yok</li>";
-  else{
+  if(!rows.length){
+    const li=document.createElement("li"); li.textContent=T("noPlayers"); list.appendChild(li);
+  }else{
     const note=document.createElement("li");
     note.style.cssText="list-style:none;opacity:.55;font-size:10px;margin-top:8px";
-    note.textContent="⛓ zincir puanları son ~20 saatin kayıtlarından hesaplanır";
+    note.textContent=T("lbNote");
     list.appendChild(note);
   }
 });
@@ -927,7 +1092,7 @@ async function ensureChainNow(){
         params:[{chainId:CHAIN.idHex}]});
     }
     const after = await window.ethereum.request({method:"eth_chainId"});
-    if(after !== CHAIN.idHex) throw new Error("Robinhood Chain'e geçilemedi");
+    if(after !== CHAIN.idHex) throw new Error(T("switchFailed"));
   }
 }
 async function chainSigned(){
@@ -936,7 +1101,7 @@ async function chainSigned(){
   signer = await bp.getSigner();
   const sAddr = (await signer.getAddress()).toLowerCase();
   if(mode==="chain" && me.uid && sAddr !== me.uid)
-    throw new Error("Cüzdanda hesap değişti — sayfayı yenileyip tekrar gir.");
+    throw new Error(T("accountChanged"));
   return new ethersLib.Contract(CHAIN.contract, CHAIN_ABI, signer);
 }
 
@@ -944,7 +1109,7 @@ async function walletLogin(){
   const err = $("authErr");
   try{
     if(!window.ethereum){
-      err.textContent = "Cüzdan bulunamadı — MetaMask (metamask.io) kurup tekrar dene.";
+      err.textContent = T("noWallet");
       return;
     }
     await loadEthers();
@@ -976,19 +1141,19 @@ async function walletLogin(){
   }catch(e){
     signer=null; chainRegistered=false;
     if(mode==="chain") mode="guest";
-    err.textContent = "Cüzdan girişi başarısız: " + (e.shortMessage||e.message||e);
+    err.textContent = T("walletLoginFailed") + (e.shortMessage||e.message||e);
   }
 }
 
 async function chainRegister(name, team){
-  banner("CÜZDAN ONAYI BEKLENİYOR…","#ffb937");
+  banner(T("walletWait"),"#ffb937");
   const signed = await chainSigned();
   const tx = await signed.register(name, team==="bear"?2:1);
   await tx.wait();
   chainRegistered = true;
 }
 async function chainSetTeam(team){
-  banner("CÜZDAN ONAYI BEKLENİYOR…","#ffb937");
+  banner(T("walletWait"),"#ffb937");
   const signed = await chainSigned();
   const tx = await signed.setTeam(team==="bear"?2:1);
   await tx.wait();
@@ -1109,7 +1274,7 @@ $("walletBtn").addEventListener("click", walletLogin);
 let simOn=false;
 function startSim(){
   if(simOn) return; simOn=true;
-  statusEl.textContent="◌ SİMÜLASYON MODU"; statusEl.className="sim";
+  setStatus("sim");
   let p = price||63200;
   if(!dayOpen) dayOpen=p;
   setInterval(()=>{
@@ -1254,7 +1419,7 @@ function startGame(){
   if(!started){
     started = true;
     spawn("bull",8); spawn("bear",8);   /* açılış çatışması */
-    banner("SAVAŞ BAŞLADI","#ffb937");
+    banner(T("warStarted"),"#ffb937");
   }
   if(CHAIN.contract || (db && fbUser)) $("lbBtn").classList.remove("hidden");
   if(!me.name)      showSetup("name");
