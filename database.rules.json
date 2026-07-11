@@ -1,0 +1,44 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "players": {
+      ".read": true,
+      ".indexOn": ["points"],
+      "$uid": {
+        ".write": "auth != null && auth.uid === $uid",
+        "points":    { ".validate": "newData.isNumber()" },
+        "wins":      { ".validate": "newData.isNumber()" },
+        "name":      { ".validate": "newData.isString() && newData.val().length <= 20" },
+        "nameLower": { ".validate": "newData.isString() && newData.val().length <= 20" },
+        "team":      { ".validate": "newData.val() === 'bull' || newData.val() === 'bear' || newData.val() === ''" },
+        "updatedAt": { ".validate": "newData.isNumber()" },
+        "$other":    { ".validate": false }
+      }
+    },
+
+    "usernames": {
+      ".read": true,
+      "$name": {
+        ".write": "auth != null && (!data.exists() || data.child('uid').val() === auth.uid) && newData.child('uid').val() === auth.uid"
+      }
+    },
+
+    "epochs": {
+      ".read": true,
+      "$eid": {
+        "preds": {
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid",
+            "name":   { ".validate": "newData.isString() && newData.val().length <= 20" },
+            "team":   { ".validate": "newData.val() === 'bull' || newData.val() === 'bear'" },
+            "target": { ".validate": "newData.isNumber() && newData.val() > 0" },
+            "t":      { ".validate": "newData.isNumber()" },
+            "$other": { ".validate": false }
+          }
+        }
+      }
+    }
+  }
+}

@@ -54,8 +54,9 @@ Sahibi: İzzet (Hurrian AI — hurrianai.com). İletişim dili: Türkçe.
 - Oyun kuralı (kontratla uyumlu): tahmin her zaman BİR SONRAKİ epoch'u hedefler;
   predict(fiyat_cent, epoch) ve epoch != currentEpoch()+1 ise revert. İsimler
   zincirde beyaz listeli (a-z 0-9 _ + Türkçe) ve büyük/küçük katlamalı benzersiz.
-- Giriş modları: 🦊 cüzdan (MetaMask, zincir kayıt/tahmin) + 🔑 Google (Firebase,
-  config hâlâ bekleniyor) + misafir.
+- Giriş modları: 🦊 cüzdan (MetaMask, zincir kayıt/tahmin) + 🔑 Google (Firebase
+  Auth + Realtime Database — Firestore DEĞİL, RTDB kartsız Spark'ta çalışıyor;
+  kurallar database.rules.json; config hâlâ bekleniyor) + misafir.
 
 ## Olası sonraki adımlar (kullanıcı isterse)
 - Ses efektleri, gece/gündüz döngüsü

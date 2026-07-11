@@ -66,7 +66,7 @@ forge script contracts/script/Deploy.s.sol --root contracts \
 
 ## Teknoloji / Stack
 
-Three.js (r128) · Binance WebSocket API · Robinhood Chain (Solidity + Foundry, ethers.js) · Firebase Auth + Firestore · Vanilla JS
+Three.js (r128) · Binance WebSocket API · Robinhood Chain (Solidity + Foundry, ethers.js) · Firebase Auth + Realtime Database · Vanilla JS
 
 ---
 Built by [Hurrian AI](https://hurrianai.com) 🎵

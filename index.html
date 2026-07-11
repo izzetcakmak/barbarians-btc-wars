@@ -613,7 +613,7 @@ async function submitPred(){
   myPreds.set(targetEid, t);
   heroesDesired.set(me.uid, {uid:me.uid, side:me.team, name:me.name, target:t, eid:targetEid});
   if(mode==="google" && db && fbUser)
-    db.collection("epochs").doc(String(targetEid)).collection("preds").doc(me.uid)
+    db.ref("epochs/"+targetEid+"/preds/"+me.uid)
       .set({name:me.name, team:me.team, target:t, t:Date.now()})
       .catch(e=>console.warn("tahmin yazılamadı", e));
   $("predInput").classList.add("hidden");
@@ -638,19 +638,16 @@ $("nameBtn").addEventListener("click", async ()=>{
     }
     /* zincirde rezervasyon takım seçiminde register() tx'iyle yapılır */
   }
-  if(mode==="google" && db && fbUser){  /* kullanıcı adını Firestore'da rezerve et */
+  if(mode==="google" && db && fbUser){  /* kullanıcı adını veritabanında rezerve et */
     $("nameErr").textContent = "kontrol ediliyor…";
     try{
       const key = n.toLowerCase();
-      await db.runTransaction(async tx=>{
-        const ref = db.collection("usernames").doc(key);
-        const s = await tx.get(ref);
-        if(s.exists && s.data().uid!==me.uid) throw new Error("taken");
-        tx.set(ref, {uid:me.uid});
-        tx.set(db.collection("players").doc(me.uid),
-          {name:n, nameLower:key, points:me.pts||0, team:me.team||"", updatedAt:Date.now()},
-          {merge:true});
-      });
+      const res = await db.ref("usernames/"+key).transaction(cur =>
+        (cur !== null && cur.uid !== me.uid) ? undefined   /* alınmış — iptal */
+                                             : {uid: me.uid});
+      if(!res.committed) throw new Error("taken");
+      await db.ref("players/"+me.uid).update(
+        {name:n, nameLower:key, points:me.pts||0, team:me.team||"", updatedAt:Date.now()});
       $("nameErr").textContent = "";
     }catch(e){
       $("nameErr").textContent = e.message==="taken"
@@ -687,7 +684,7 @@ async function pickTeam(t){
   me.team = t;
   localStorage.setItem("bbw_team", t);
   if(mode==="google" && db && fbUser)
-    db.collection("players").doc(me.uid).set({team:t}, {merge:true})
+    db.ref("players/"+me.uid).update({team:t})
       .catch(e=>console.warn("takım yazılamadı", e));
   hideSetup(); updateMe(); resetPredictUI();
   banner(t==="bull" ? "BOĞA ORDUSUNA KATILDIN" : "AYI İSKELETLERİNE KATILDIN",
@@ -717,10 +714,10 @@ addEventListener("epoch-resolved", e=>{
       me.pts += gained;
       if(mode!=="chain") localStorage.setItem("bbw_pts", me.pts);  /* zincir puanı event'lerden hesaplanır */
       if(mode==="google" && db && fbUser)
-        db.collection("players").doc(me.uid).set({
-          points: firebase.firestore.FieldValue.increment(gained),
-          wins:   firebase.firestore.FieldValue.increment(winner===me.team ? 1 : 0)
-        }, {merge:true}).catch(err=>console.warn("puan yazılamadı", err));
+        db.ref("players/"+me.uid).update({
+          points: firebase.database.ServerValue.increment(gained),
+          wins:   firebase.database.ServerValue.increment(winner===me.team ? 1 : 0)
+        }).catch(err=>console.warn("puan yazılamadı", err));
       feedText(`<span class="${me.team==="bull"?"b":"s"}">${esc(me.name)}</span> +${gained} puan 🏆`);
     }
     myPreds.delete(eid);
@@ -733,7 +730,8 @@ addEventListener("epoch-resolved", e=>{
 
 /* ============ FIREBASE (Google girişi + çok oyunculu) ============ */
 /* firebase-config.js dosyası window.FIREBASE_CONFIG tanımlarsa Google girişi
-   ve Firestore senkronu devreye girer; yoksa oyun misafir modunda kalır. */
+   ve Realtime Database senkronu devreye girer; yoksa oyun misafir modunda
+   kalır. (RTDB tercih sebebi: Spark planında kart gerektirmez.) */
 let db=null, fbUser=null, unsubPreds=null;   /* unsubPreds: abonelik iptal fonksiyonları dizisi */
 const FB_CONF = window.FIREBASE_CONFIG || null;
 
@@ -749,9 +747,13 @@ async function initFirebase(){
     const V="10.14.1";
     await loadScript(`https://www.gstatic.com/firebasejs/${V}/firebase-app-compat.js`);
     await loadScript(`https://www.gstatic.com/firebasejs/${V}/firebase-auth-compat.js`);
-    await loadScript(`https://www.gstatic.com/firebasejs/${V}/firebase-firestore-compat.js`);
+    await loadScript(`https://www.gstatic.com/firebasejs/${V}/firebase-database-compat.js`);
+    /* Realtime Database URL config'te yoksa Belçika bölgesi varsayılır
+       (Firestore yerine RTDB: Spark planında kartsız çalışır) */
+    if(!FB_CONF.databaseURL && FB_CONF.projectId)
+      FB_CONF.databaseURL = "https://"+FB_CONF.projectId+"-default-rtdb.europe-west1.firebasedatabase.app";
     firebase.initializeApp(FB_CONF);
-    db = firebase.firestore();
+    db = firebase.database();
     $("googleBtn").classList.remove("hidden");
     firebase.auth().onAuthStateChanged(u=>{
       fbUser=u;
@@ -767,12 +769,12 @@ async function googleLogin(){
       const r = await firebase.auth().signInWithPopup(new firebase.auth.GoogleAuthProvider());
       fbUser = r.user;
     }
-    const snap = await db.collection("players").doc(fbUser.uid).get();
+    const snap = await db.ref("players/"+fbUser.uid).once("value");
+    const d = snap.val();
     /* durum ancak akış başarılıysa değişir */
     mode = "google";
     me.uid = fbUser.uid;
-    if(snap.exists){
-      const d = snap.data();
+    if(d){
       me.name = d.name || "";
       me.team = d.team || "";
       me.pts  = Number(d.points) || 0;
@@ -791,29 +793,31 @@ async function googleLogin(){
 
 function subscribePreds(){
   if(!db) return;
-  if(unsubPreds){ for(const u of unsubPreds) u(); }
+  if(unsubPreds){ for(const u of unsubPreds) u.ref.off("value", u.cb); }
   /* hedefi mevcut epoch olanlar (geçen epoch girildi) + sonraki epoch'a
      şimdi girilenler — ikisi de sahada görünsün */
-  unsubPreds = [curEpoch, curEpoch+1].map(eid =>
-    db.collection("epochs").doc(String(eid)).collection("preds")
-      .onSnapshot(qs=>{
-        qs.forEach(doc=>{
-          if(doc.id===me.uid) return;            /* kendimiz zaten sahadayız */
-          const d = doc.data();
-          if(!d || !(+d.target>0)) return;
-          heroesDesired.set(doc.id, {
-            uid:doc.id,
-            side: d.team==="bear" ? "bear" : "bull",
-            name: String(d.name||"?").slice(0,16),
-            target:+d.target,
-            eid
-          });
+  unsubPreds = [curEpoch, curEpoch+1].map(eid => {
+    const ref = db.ref("epochs/"+eid+"/preds");
+    const cb = ref.on("value", snap => {
+      snap.forEach(child => {
+        const uid = child.key;
+        if(uid===me.uid) return;               /* kendimiz zaten sahadayız */
+        const d = child.val();
+        if(!d || !(+d.target>0)) return;
+        heroesDesired.set(uid, {
+          uid,
+          side: d.team==="bear" ? "bear" : "bull",
+          name: String(d.name||"?").slice(0,16),
+          target:+d.target,
+          eid
         });
-      }, err=>console.warn("tahmin akışı hatası", err))
-  );
+      });
+    }, err=>console.warn("tahmin akışı hatası", err));
+    return {ref, cb};
+  });
 }
 
-/* liderlik tablosu: zincir (event'lerden) + Google (Firestore) birleşik */
+/* liderlik tablosu: zincir (event'lerden) + Google (RTDB) birleşik */
 $("lbBtn").addEventListener("click", async ()=>{
   const list=$("lbList");
   list.innerHTML="<li>yükleniyor…</li>";
@@ -822,10 +826,10 @@ $("lbBtn").addEventListener("click", async ()=>{
   try{ rows.push(...await chainLeaderboard()); }catch(e){}
   if(db){
     try{
-      const q = await db.collection("players").orderBy("points","desc").limit(10).get();
-      q.forEach(doc=>{
-        const d=doc.data();
-        /* points sayıya zorlanır — Firestore'a string yazan bir hesap
+      const snap = await db.ref("players").orderByChild("points").limitToLast(10).once("value");
+      snap.forEach(child=>{
+        const d=child.val()||{};
+        /* points sayıya zorlanır — veritabanına string yazan bir hesap
            HTML enjekte edemesin */
         rows.push({name:String(d.name||"?").slice(0,20), team:d.team==="bear"?"bear":"bull",
                    pts:Number(d.points)||0, src:"🔑"});
