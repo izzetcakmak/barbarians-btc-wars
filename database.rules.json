@@ -10,6 +10,7 @@
         ".write": "auth != null && auth.uid === $uid",
         "points":    { ".validate": "newData.isNumber()" },
         "wins":      { ".validate": "newData.isNumber()" },
+        "lastEpoch": { ".validate": "newData.isNumber()" },
         "name":      { ".validate": "newData.isString() && newData.val().length <= 20" },
         "nameLower": { ".validate": "newData.isString() && newData.val().length <= 20" },
         "team":      { ".validate": "newData.val() === 'bull' || newData.val() === 'bear' || newData.val() === ''" },

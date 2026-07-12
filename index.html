@@ -131,6 +131,10 @@
   #lbBtn{position:fixed;top:46px;left:14px;font-size:11px;letter-spacing:1px;
     padding:6px 10px;border:1px solid rgba(255,255,255,.2);background:rgba(0,0,0,.55);
     cursor:pointer;pointer-events:auto;z-index:5}
+  #epochChip{position:fixed;top:78px;left:14px;font-size:11px;letter-spacing:1px;
+    padding:6px 10px;border:1px solid rgba(255,183,55,.45);background:rgba(0,0,0,.55);
+    color:var(--amber);z-index:5}
+  #epochChip b{font-size:13px}
   #lbPanel{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:10;
     background:rgba(10,12,8,.96);border:1px solid rgba(255,255,255,.25);padding:22px 28px;
     min-width:min(340px,90vw);pointer-events:auto;text-align:center}
@@ -245,6 +249,7 @@
 </div>
 
 <div id="lbBtn" class="hidden">🏆 LEADERS</div>
+<div id="epochChip">⏱ EPOCH #— · <b>–:––</b></div>
 <div id="lbPanel" class="hidden">
   <h2 id="lbTitle">🏆 LEADERBOARD</h2>
   <ol id="lbList"></ol>
@@ -558,7 +563,7 @@ const I18N = {
     bearPick: "💀 BEAR SKELETONS<br><small>melee fighters</small>",
     predLabel: "🎯 YOUR BTC TARGET FOR NEXT EPOCH", predPh: "e.g. 63450",
     joinBattle: "JOIN THE BATTLE", confirmWait: "CONFIRM…",
-    predDone: p => "⚔ You're in the next epoch with a $" + p + " target!",
+    predDone: (p, e) => "⚔ You're in EPOCH #" + e + " with a $" + p + " target!",
     lbBtn: "🏆 LEADERS", lbTitle: "🏆 LEADERBOARD", close: "CLOSE",
     loading: "loading…", noPlayers: "no players yet",
     lbNote: "⛓ chain points are computed from the last ~20h of records",
@@ -610,7 +615,7 @@ const I18N = {
     bearPick: "💀 AYI İSKELETLERİ<br><small>yakın dövüşür</small>",
     predLabel: "🎯 SONRAKİ EPOCH BTC HEDEFİN", predPh: "örn. 63450",
     joinBattle: "SAVAŞA GİR", confirmWait: "ONAY…",
-    predDone: p => "⚔ $" + p + " hedefiyle sonraki epoch'tasın!",
+    predDone: (p, e) => "⚔ $" + p + " hedefiyle EPOCH #" + e + "'desin!",
     lbBtn: "🏆 LİDERLER", lbTitle: "🏆 LİDERLİK TABLOSU", close: "KAPAT",
     loading: "yükleniyor…", noPlayers: "henüz oyuncu yok",
     lbNote: "⛓ zincir puanları son ~20 saatin kayıtlarından hesaplanır",
@@ -769,6 +774,7 @@ function epochTick(){
   const tEl = $("epochTimer");
   tEl.textContent = fmtLeft(left);
   tEl.classList.toggle("ending", left < 15000);
+  $("epochChip").innerHTML = "⏱ EPOCH #" + (eid % 100000) + " · <b>" + fmtLeft(left) + "</b>";
   if(eid !== curEpoch){
     const prev = curEpoch;
     curEpoch = eid;
@@ -903,7 +909,10 @@ function updateMe(){
   if(!me.name){ el.classList.add("hidden"); return; }
   el.classList.remove("hidden");
   const icon = me.team==="bull" ? "🟢" : me.team==="bear" ? "💀" : "";
-  el.innerHTML = `${icon} <b>${esc(me.name)}</b> · ${me.pts} ${T("points")}`;
+  let pend = 0;                              /* bekleyen tahminin hedef epoch'u */
+  for(const k of myPreds.keys()) if(k >= curEpoch && k > pend) pend = k;
+  el.innerHTML = `${icon} <b>${esc(me.name)}</b> · ${me.pts} ${T("points")}`
+               + (pend ? ` · ⚔ #${pend % 100000}` : "");
 }
 function resetPredictUI(){
   if(!started || !me.team) return;
@@ -945,7 +954,11 @@ async function submitPred(){
   $("predBtn").classList.add("hidden");
   const pd = $("predDone");
   pd.classList.remove("hidden");
-  pd.textContent = T("predDone")(t.toLocaleString("en-US"));
+  pd.textContent = T("predDone")(t.toLocaleString("en-US"), targetEid % 100000);
+  updateMe();                               /* rozette aktif epoch görünsün */
+  if(mode==="google" && db && fbUser)
+    db.ref("players/"+me.uid).update({lastEpoch: targetEid})
+      .catch(e=>console.warn("epoch yazılamadı", e));
 }
 $("predBtn").addEventListener("click", submitPred);
 $("predInput").addEventListener("keydown", e=>{ if(e.key==="Enter") submitPred(); });
@@ -1158,7 +1171,7 @@ $("lbBtn").addEventListener("click", async ()=>{
         /* points sayıya zorlanır — veritabanına string yazan bir hesap
            HTML enjekte edemesin */
         rows.push({name:String(d.name||"?").slice(0,20), team:d.team==="bear"?"bear":"bull",
-                   pts:Number(d.points)||0, src:"🔑"});
+                   pts:Number(d.points)||0, src:"🔑", lastEpoch:Number(d.lastEpoch)||0});
       });
     }catch(e){}
   }
@@ -1166,7 +1179,9 @@ $("lbBtn").addEventListener("click", async ()=>{
   list.innerHTML="";
   for(const r of rows.slice(0,10)){
     const li=document.createElement("li");
-    li.innerHTML = `<span class="${r.team==="bear"?"s":"b"}">${esc(r.name)}</span> — ${Number(r.pts)||0} ${T("points")} ${r.src==="🔑"?"🔑":"⛓"}`;
+    const ep = Number(r.lastEpoch)||0;                /* yarıştığı son epoch */
+    li.innerHTML = `<span class="${r.team==="bear"?"s":"b"}">${esc(r.name)}</span> — ${Number(r.pts)||0} ${T("points")} ${r.src==="🔑"?"🔑":"⛓"}`
+                 + (ep ? ` <span style="opacity:.55">· #${ep % 100000}</span>` : "");
     list.appendChild(li);
   }
   if(!rows.length){
@@ -1465,11 +1480,14 @@ async function chainLeaderboard(force){
     }
   }catch(e){ return lbCache.rows; }
   const byEpoch = new Map();
+  const lastAct = new Map();                          /* uid -> son aktif epoch */
   for(const ev of evs){
     const e = Number(ev.args.epoch);
+    const uid = ev.args.player.toLowerCase();
+    if(e > (lastAct.get(uid)||0)) lastAct.set(uid, e);
     if(e >= curEpoch) continue;                       /* bitmemiş epoch */
     if(!byEpoch.has(e)) byEpoch.set(e, new Map());
-    byEpoch.get(e).set(ev.args.player.toLowerCase(), ev);  /* son event kazanır */
+    byEpoch.get(e).set(uid, ev);                      /* son event kazanır */
   }
   let epochs = [...byEpoch.keys()].sort((a,b)=>a-b);
   if(!epochs.length){ lbCache={t:Date.now(),rows:[]}; return []; }
@@ -1505,8 +1523,8 @@ async function chainLeaderboard(force){
     me.pts = scores.get(me.uid).pts;
     updateMe();
   }
-  const rows = [...scores.values()].sort((a,b)=>b.pts-a.pts).slice(0,10)
-    .map(s => ({...s, src:"⛓"}));
+  const rows = [...scores.entries()].sort((a,b)=>b[1].pts-a[1].pts).slice(0,10)
+    .map(([uid,s]) => ({...s, src:"⛓", lastEpoch: lastAct.get(uid)||0}));
   lbCache = {t:Date.now(), rows};
   return rows;
 }
