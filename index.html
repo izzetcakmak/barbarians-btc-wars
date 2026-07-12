@@ -93,12 +93,15 @@
   #setup button{font:inherit;font-size:13px;letter-spacing:2px;padding:11px 26px;
     border:none;cursor:pointer;font-weight:bold;background:var(--bull);color:#0d0f0a}
   .teamrow{display:flex;gap:14px;flex-wrap:wrap;justify-content:center}
+  .teamrow{align-items:flex-end}
+  .champ{display:flex;flex-direction:column;align-items:center;gap:10px}
+  .champ canvas{width:min(260px,42vw);height:auto;aspect-ratio:26/30;display:block}
   .teambtn{font:inherit;font-size:14px;letter-spacing:2px;padding:16px 22px;cursor:pointer;
     font-weight:bold;border:2px solid transparent;min-width:200px}
-  .teambtn.bull{background:#22301a;color:#8fe06a;border-color:#5da13f}
-  .teambtn.bull:hover{background:#2e4023}
-  .teambtn.bear{background:#26241f;color:#e8e2d4;border-color:#8a8474}
-  .teambtn.bear:hover{background:#333026}
+  #setup .teambtn.bull{background:#22301a;color:#8fe06a;border-color:#5da13f}
+  #setup .teambtn.bull:hover{background:#2e4023}
+  #setup .teambtn.bear{background:#26241f;color:#e8e2d4;border-color:#8a8474}
+  #setup .teambtn.bear:hover{background:#333026}
 
   #me{position:fixed;top:14px;left:14px;font-size:11px;letter-spacing:1px;
     padding:6px 10px;border:1px solid rgba(255,255,255,.2);background:rgba(0,0,0,.55);
@@ -198,8 +201,14 @@
   <div id="stepTeam" class="hidden">
     <h2 id="teamTitle">CHOOSE YOUR ARMY</h2>
     <div class="teamrow">
-      <button class="teambtn bull" id="pickBull"></button>
-      <button class="teambtn bear" id="pickBear"></button>
+      <div class="champ">
+        <canvas id="champBull" width="260" height="300"></canvas>
+        <button class="teambtn bull" id="pickBull"></button>
+      </div>
+      <div class="champ">
+        <canvas id="champBear" width="260" height="300"></canvas>
+        <button class="teambtn bear" id="pickBear"></button>
+      </div>
     </div>
   </div>
 </div>
@@ -320,6 +329,118 @@ function makeBear(){                       /* iskelet */
   const claw = bx(.5,.06,.06,boneMat2); claw.position.set(0,1.45,.42); g.add(claw);
   g.userData={legL:lL,legR:lR};
   return g;
+}
+
+/* ============ ŞAMPİYON VİTRİNİ ============ */
+/* Takım seçme ekranında her ordudan bir şampiyon: yakın plan, kaide üstünde,
+   kendi ekseninde dönerek sergilenir (kendi mini WebGL sahnelerinde). */
+const goldMat  = new THREE.MeshLambertMaterial({color:0xd8a83c});
+const steelMat = new THREE.MeshLambertMaterial({color:0x9aa3ad});
+const capeMat  = new THREE.MeshLambertMaterial({color:0x1c2415});
+const capeMat2 = new THREE.MeshLambertMaterial({color:0x2a2622});
+const glowMat  = new THREE.MeshBasicMaterial({color:0xff4030});
+const plumeMat = new THREE.MeshLambertMaterial({color:0xb3402e});
+
+function makeChampBull(){                 /* altın zırhlı komutan */
+  const g = new THREE.Group();
+  const lL=bx(.26,.8,.26,bullMat); lL.position.set(-.2,.54,0); g.add(lL);
+  const lR=lL.clone(); lR.position.x=.2; g.add(lR);
+  const kL=bx(.3,.14,.3,goldMat); kL.position.set(-.2,.62,0); g.add(kL);
+  const kR=kL.clone(); kR.position.x=.2; g.add(kR);
+  const belt=bx(.78,.16,.5,capeMat); belt.position.y=1.0; g.add(belt);
+  const buckle=bx(.18,.12,.06,goldMat); buckle.position.set(0,1.0,.26); g.add(buckle);
+  const body=bx(.74,.8,.48,bullMat); body.position.y=1.5; g.add(body);
+  const chest=bx(.6,.5,.1,bullMat2); chest.position.set(0,1.6,.28); g.add(chest);
+  const trim=bx(.6,.07,.12,goldMat); trim.position.set(0,1.86,.27); g.add(trim);
+  const sL=bx(.34,.18,.5,bullMat2); sL.position.set(-.52,1.92,0); g.add(sL);
+  const sLt=bx(.38,.06,.54,goldMat); sLt.position.set(-.52,2.03,0); g.add(sLt);
+  const sR=sL.clone(); sR.position.x=.52; g.add(sR);
+  const sRt=sLt.clone(); sRt.position.x=.52; g.add(sRt);
+  const head=bx(.4,.36,.4,bullMat); head.position.y=2.22; g.add(head);
+  const helm=bx(.48,.2,.48,bullMat2); helm.position.y=2.44; g.add(helm);
+  const visor=bx(.42,.06,.05,goldMat); visor.position.set(0,2.28,.21); g.add(visor);
+  const plume=bx(.1,.42,.26,plumeMat); plume.position.set(0,2.72,-.04); plume.rotation.x=.18; g.add(plume);
+  const cape=bx(.7,1.25,.07,capeMat); cape.position.set(0,1.45,-.32); cape.rotation.x=.1; g.add(cape);
+  const aL=bx(.2,.6,.2,bullMat); aL.position.set(-.56,1.5,.1); aL.rotation.x=-.7; g.add(aL);
+  const aR=bx(.2,.6,.2,bullMat); aR.position.set(.56,1.5,.14); aR.rotation.x=-1.15; g.add(aR);
+  const rifle=bx(.13,.13,1.5,gunMat); rifle.position.set(.56,1.72,.55); g.add(rifle);
+  const band=bx(.16,.16,.1,goldMat); band.position.set(.56,1.72,.9); g.add(band);
+  const bayonet=bx(.05,.16,.34,steelMat); bayonet.position.set(.56,1.8,1.35); g.add(bayonet);
+  g.scale.setScalar(1.05);
+  return g;
+}
+function makeChampBear(){                 /* boynuzlu iskelet savaş lordu */
+  const g = new THREE.Group();
+  const lL=bx(.2,.85,.2,boneMat2); lL.position.set(-.18,.56,0); g.add(lL);
+  const lR=lL.clone(); lR.position.x=.18; g.add(lR);
+  const pelvis=bx(.55,.22,.34,boneMat); pelvis.position.y=1.05; g.add(pelvis);
+  const spine=bx(.16,.62,.16,boneMat); spine.position.y=1.5; g.add(spine);
+  for(let i=0;i<4;i++){
+    const rib=bx(.68,.09,.4,boneMat); rib.position.y=1.28+i*.19; g.add(rib);
+  }
+  const heart=bx(.14,.14,.14,glowMat); heart.position.set(0,1.5,.12); g.add(heart);
+  const spikeL=bx(.4,.16,.4,boneMat2); spikeL.position.set(-.5,1.95,0); g.add(spikeL);
+  const shornL=bx(.12,.34,.12,boneMat2); shornL.position.set(-.58,2.16,0); shornL.rotation.z=.35; g.add(shornL);
+  const spikeR=spikeL.clone(); spikeR.position.x=.5; g.add(spikeR);
+  const shornR=bx(.12,.34,.12,boneMat2); shornR.position.set(.58,2.16,0); shornR.rotation.z=-.35; g.add(shornR);
+  const skull=bx(.44,.4,.42,boneMat); skull.position.y=2.32; g.add(skull);
+  const jaw=bx(.36,.12,.3,boneMat2); jaw.position.set(0,2.08,.06); g.add(jaw);
+  const hL=bx(.13,.4,.13,boneMat2); hL.position.set(-.3,2.62,0); hL.rotation.z=.5; g.add(hL);
+  const hR=bx(.13,.4,.13,boneMat2); hR.position.set(.3,2.62,0); hR.rotation.z=-.5; g.add(hR);
+  const eL=bx(.1,.1,.06,glowMat); eL.position.set(-.11,2.36,.22); g.add(eL);
+  const eR=eL.clone(); eR.position.x=.11; g.add(eR);
+  const cape=bx(.75,1.3,.07,capeMat2); cape.position.set(0,1.55,-.3); cape.rotation.x=.08; g.add(cape);
+  const aR=bx(.16,.6,.16,boneMat2); aR.position.set(.5,1.6,.1); aR.rotation.x=-.5; g.add(aR);
+  const hilt=bx(.3,.08,.08,goldMat); hilt.position.set(.5,1.9,.32); g.add(hilt);
+  const blade=bx(.07,1.5,.2,steelMat); blade.position.set(.5,2.7,.32); g.add(blade);
+  const aL=bx(.16,.6,.16,boneMat2); aL.position.set(-.5,1.45,.15); aL.rotation.x=-1.0; g.add(aL);
+  const claw=bx(.5,.07,.07,boneMat2); claw.position.set(-.5,1.75,.42); g.add(claw);
+  return g;
+}
+
+let champViews = null, champRAF = 0;
+function buildChampViews(){
+  const mk = (id, builder, rimColor, ringColor) => {
+    const canvas = document.getElementById(id);
+    const r = new THREE.WebGLRenderer({canvas, antialias:true, alpha:true});
+    r.setPixelRatio(Math.min(devicePixelRatio, 2));
+    const sc = new THREE.Scene();
+    const cam = new THREE.PerspectiveCamera(34, 260/300, .1, 60);
+    cam.position.set(0, 2.3, 6.9);
+    cam.lookAt(0, 1.7, 0);
+    sc.add(new THREE.HemisphereLight(0xfff2d8, 0x1a160f, 1.0));
+    const key = new THREE.DirectionalLight(0xffe9c0, 1.1);
+    key.position.set(3, 6, 4); sc.add(key);
+    const rim = new THREE.DirectionalLight(rimColor, 1.6);
+    rim.position.set(-4, 2.5, -5); sc.add(rim);
+    const model = builder(); sc.add(model);
+    const ped = new THREE.Mesh(new THREE.CylinderGeometry(1.55, 1.8, .28, 28),
+      new THREE.MeshLambertMaterial({color:0x14170e}));
+    ped.position.y = -.14; sc.add(ped);
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(1.62, .045, 10, 40),
+      new THREE.MeshBasicMaterial({color:ringColor}));
+    ring.rotation.x = Math.PI/2; ring.position.y = .02; sc.add(ring);
+    return {r, sc, cam, model};
+  };
+  champViews = [
+    mk("champBull", makeChampBull, 0x8fe06a, 0x5da13f),
+    mk("champBear", makeChampBear, 0xff6a50, 0xb8b0a0)
+  ];
+}
+function champLoopStep(){
+  const setup = document.getElementById("setup"), team = document.getElementById("stepTeam");
+  if(setup.classList.contains("hidden") || team.classList.contains("hidden")){ champRAF = 0; return; }
+  const t = performance.now()/1000;
+  for(const v of champViews){
+    v.model.rotation.y = t * .9;                    /* kendi ekseninde dönüş */
+    v.model.position.y = Math.sin(t*2.2) * .06;     /* hafif nefes */
+    v.r.render(v.sc, v.cam);
+  }
+  champRAF = requestAnimationFrame(champLoopStep);
+}
+function startChampLoop(){
+  if(!champViews) buildChampViews();
+  if(!champRAF) champRAF = requestAnimationFrame(champLoopStep);
 }
 
 /* ============ SAVAŞ MOTORU ============ */
@@ -736,6 +857,7 @@ function showSetup(step){
   $("stepName").classList.toggle("hidden", step!=="name");
   $("stepTeam").classList.toggle("hidden", step!=="team");
   if(step==="name") setTimeout(()=>$("nameInput").focus(), 50);
+  if(step==="team") startChampLoop();               /* şampiyon vitrini */
 }
 function hideSetup(){ $("setup").classList.add("hidden"); }
 function updateMe(){
