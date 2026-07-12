@@ -147,11 +147,25 @@
   #langBtn span{opacity:.45;padding:0 3px}
   #langBtn span.on{opacity:1;color:var(--amber);font-weight:bold}
 
-  #credit{position:fixed;bottom:10px;right:12px;z-index:5;text-align:right;
-    font-size:10px;letter-spacing:.5px;line-height:1.7;opacity:.75;
-    text-shadow:0 1px 4px #000;pointer-events:none}
+  #credit{position:fixed;bottom:10px;right:12px;z-index:4;text-align:right;
+    font-size:10px;letter-spacing:.5px;line-height:1.7;pointer-events:none;
+    background:rgba(10,12,8,.85);border:1px solid rgba(255,255,255,.18);
+    padding:7px 11px;color:#f2eee2;text-shadow:0 1px 3px #000}
   #credit b{color:var(--amber);font-weight:bold}
   #credit .f2ptag{color:#8fe06a;font-weight:bold}
+
+  /* zafer kartı */
+  #winCard{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:11;
+    background:rgba(10,12,8,.97);border:2px solid var(--amber);padding:16px;
+    pointer-events:auto;text-align:center;max-width:94vw}
+  #winCard canvas{width:min(560px,88vw);height:auto;display:block;border:1px solid rgba(255,255,255,.15)}
+  #winCard .row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:12px}
+  #winCard button{font:inherit;font-size:12px;letter-spacing:2px;padding:10px 18px;
+    border:none;cursor:pointer;font-weight:bold}
+  #shareXBtn{background:#f2eee2;color:#0d0f0a}
+  #dlCardBtn{background:var(--amber);color:#0d0f0a}
+  #winClose{background:#3a3a30;color:#f2eee2}
+  #winHint{font-size:10px;opacity:.6;margin-top:8px;letter-spacing:1px}
 
   .f2p{display:inline-block;margin-top:6px;padding:5px 14px;font-size:11px;
     letter-spacing:2px;font-weight:bold;color:#0d0f0a;background:#8fe06a;
@@ -218,6 +232,16 @@
   <input id="predInput" type="number" step="0.01" min="1" placeholder="e.g. 63450" inputmode="decimal">
   <button id="predBtn">JOIN THE BATTLE</button>
   <span id="predDone" class="hidden"></span>
+</div>
+
+<div id="winCard" class="hidden">
+  <canvas id="winCanvas" width="1200" height="675"></canvas>
+  <div class="row">
+    <button id="shareXBtn">𝕏 SHARE</button>
+    <button id="dlCardBtn">⬇ DOWNLOAD</button>
+    <button id="winClose">CLOSE</button>
+  </div>
+  <div id="winHint"></div>
 </div>
 
 <div id="lbBtn" class="hidden">🏆 LEADERS</div>
@@ -558,7 +582,13 @@ const I18N = {
     walletLoginFailed: "Wallet sign-in failed: ",
     switchFailed: "could not switch to Robinhood Chain",
     accountChanged: "wallet account changed — refresh the page and sign in again",
-    loginFailed: "Sign-in failed: "
+    loginFailed: "Sign-in failed: ",
+    shareX: "𝕏 SHARE", downloadImg: "⬇ DOWNLOAD",
+    winHint: "Tip: download the image and attach it to your post",
+    perfectCall: "🎯 SNIPER SHOT — PERFECT CALL!",
+    targetLbl: "TARGET", closeLbl: "CLOSE",
+    tweetWin: (g, eid) => "⚔️ I just scored +" + g + " pts in epoch #" + eid +
+      " of BARBARIANS BTC WARS — predict Bitcoin, command your army! Free to play → www.barbariansbtcwars.xyz #BTC #RobinhoodChain #Web3Gaming"
   },
   tr: {
     title: "BARBARIANS BTC WARS — canlı BTC savaşı",
@@ -604,7 +634,13 @@ const I18N = {
     walletLoginFailed: "Cüzdan girişi başarısız: ",
     switchFailed: "Robinhood Chain'e geçilemedi",
     accountChanged: "cüzdanda hesap değişti — sayfayı yenileyip tekrar gir",
-    loginFailed: "Giriş başarısız: "
+    loginFailed: "Giriş başarısız: ",
+    shareX: "𝕏 PAYLAŞ", downloadImg: "⬇ GÖRSELİ İNDİR",
+    winHint: "İpucu: görseli indirip gönderine ekle",
+    perfectCall: "🎯 KESKİN NİŞANCI — TAM İSABET!",
+    targetLbl: "HEDEF", closeLbl: "KAPANIŞ",
+    tweetWin: (g, eid) => "⚔️ BARBARIANS BTC WARS'ta #" + eid + " epoch'unda +" + g +
+      " puan kazandım — Bitcoin'i tahmin et, ordunu yönet! Ücretsiz → www.barbariansbtcwars.xyz #BTC #RobinhoodChain"
   }
 };
 let lang = localStorage.getItem("bbw_lang") === "tr" ? "tr" : "en";   /* varsayılan EN */
@@ -639,6 +675,8 @@ function applyLang(){
   const pb=$("predBtn"); if(pb && !pb.disabled) pb.textContent = T("joinBattle");
   $("credit").innerHTML = T("credit") + " · <span class='f2ptag'>" + T("f2p") + "</span><br>" + T("contact");
   const meEl=$("me"); if(meEl) meEl.title = T("switchTeam");
+  set("shareXBtn","shareX"); set("dlCardBtn","downloadImg");
+  set("winClose","close"); set("winHint","winHint");
   $("langEN").classList.toggle("on", lang==="en");
   $("langTR").classList.toggle("on", lang==="tr");
   try{ if(me && me.name) updateMe(); }catch(_){}   /* ilk çağrıda henüz tanımsız (TDZ) */
@@ -1004,6 +1042,7 @@ addEventListener("epoch-resolved", e=>{
           wins:   firebase.database.ServerValue.increment(winner===me.team ? 1 : 0)
         }).catch(err=>console.warn("puan yazılamadı", err));
       feedText(`<span class="${me.team==="bull"?"b":"s"}">${esc(me.name)}</span> +${gained} ${T("points")} 🏆`);
+      showWinCard(winner, gained, target, close, eid);   /* paylaşılabilir zafer kartı */
     }
     myPreds.delete(eid);
     updateMe();
@@ -1140,6 +1179,87 @@ $("lbBtn").addEventListener("click", async ()=>{
   }
 });
 $("lbClose").addEventListener("click", ()=>$("lbPanel").classList.add("hidden"));
+
+/* ============ ZAFER KARTI (X'te paylaşılabilir) ============ */
+let lastWin = null;    /* {gained, eid} — paylaşım metni için */
+
+function drawWinCard(headline, headColor, gained, target, close, eid){
+  const c = $("winCanvas"), g = c.getContext("2d");
+  const W = c.width, H = c.height;
+  g.fillStyle = "#0d0f0a"; g.fillRect(0, 0, W, H);
+  g.strokeStyle = "rgba(255,255,255,.045)"; g.lineWidth = 1;
+  for(let x = 60; x < W; x += 60){ g.beginPath(); g.moveTo(x,0); g.lineTo(x,H); g.stroke(); }
+  for(let y = 60; y < H; y += 60){ g.beginPath(); g.moveTo(0,y); g.lineTo(W,y); g.stroke(); }
+  g.strokeStyle = "#ffb937"; g.lineWidth = 6; g.strokeRect(16, 16, W-32, H-32);
+  g.textAlign = "center";
+  /* başlık: BARBARIANS BTC WARS (BTC yeşil) */
+  g.font = "bold 54px 'Courier New', monospace";
+  const p1 = "BARBARIANS ", p2 = "BTC", p3 = " WARS";
+  const w1 = g.measureText(p1).width, w2 = g.measureText(p2).width, w3 = g.measureText(p3).width;
+  let x0 = W/2 - (w1+w2+w3)/2;
+  g.textAlign = "left";
+  g.fillStyle = "#f2eee2"; g.fillText(p1, x0, 100);
+  g.fillStyle = "#8fe06a"; g.fillText(p2, x0 + w1, 100);
+  g.fillStyle = "#f2eee2"; g.fillText(p3, x0 + w1 + w2, 100);
+  g.textAlign = "center";
+  g.font = "110px serif";
+  g.fillText("🏆", W/2, 250);
+  g.font = "bold 58px 'Courier New', monospace";
+  g.fillStyle = headColor;
+  g.fillText(headline, W/2, 350, W-140);
+  g.font = "bold 46px 'Courier New', monospace";
+  g.fillStyle = "#ffb937";
+  g.fillText("⚔ " + me.name + "   +" + gained + " " + T("points"), W/2, 430, W-140);
+  g.font = "26px 'Courier New', monospace";
+  g.fillStyle = "#b9b4a5";
+  const fmt = n => "$" + Number(n).toLocaleString("en-US", {maximumFractionDigits:2});
+  g.fillText("🎯 " + T("targetLbl") + ": " + fmt(target) + "   ·   " +
+             T("closeLbl") + ": " + fmt(close) + "   ·   EPOCH #" + (eid % 100000), W/2, 490);
+  g.font = "bold 32px 'Courier New', monospace";
+  g.fillStyle = "#8fe06a";
+  g.fillText("www.barbariansbtcwars.xyz  ·  FREE TO PLAY", W/2, 570);
+  g.font = "20px 'Courier New', monospace";
+  g.fillStyle = "#7d7868";
+  g.fillText(T("credit").replace(/<\/?b>/g,"") + "  ·  info@barbariansbtcwars.xyz", W/2, 620, W-120);
+}
+
+function showWinCard(winner, gained, target, close, eid){
+  const teamWin = winner === me.team;
+  const headline = teamWin
+    ? T(me.team==="bull" ? "bullsWon" : "bearsWon").replace("🏆","").trim()
+    : T("perfectCall");
+  const headColor = teamWin ? (me.team==="bull" ? "#8fe06a" : "#e8e2d4") : "#ffb937";
+  drawWinCard(headline, headColor, gained, target, close, eid);
+  lastWin = {gained, eid: eid % 100000};
+  $("winCard").classList.remove("hidden");
+}
+window.bbwWinDemo = () => showWinCard(me.team||"bull", 15, price||64000, (price||64000)*1.0002, curEpoch);
+
+$("winClose").addEventListener("click", ()=>$("winCard").classList.add("hidden"));
+$("dlCardBtn").addEventListener("click", ()=>{
+  $("winCanvas").toBlob(b=>{
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(b);
+    a.download = "barbarians-btc-wars-victory.png";
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+  }, "image/png");
+});
+$("shareXBtn").addEventListener("click", async ()=>{
+  if(!lastWin) return;
+  const text = T("tweetWin")(lastWin.gained, lastWin.eid);
+  /* mobilde görsel+metni tek adımda paylaş; olmuyorsa X intent aç */
+  try{
+    const blob = await new Promise(r=>$("winCanvas").toBlob(r, "image/png"));
+    const file = new File([blob], "barbarians-victory.png", {type:"image/png"});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      await navigator.share({files:[file], text});
+      return;
+    }
+  }catch(e){ /* kullanıcı vazgeçti ya da desteklenmiyor → intent */ }
+  window.open("https://twitter.com/intent/tweet?text=" + encodeURIComponent(text),
+              "_blank", "noopener");
+});
 
 /* ============ ROBINHOOD CHAIN (cüzdan girişi) ============ */
 /* Kontrat adresi deploy sonrası doldurulur; boşken cüzdan girişi gizli kalır
