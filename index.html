@@ -986,7 +986,7 @@ addEventListener("epoch-start", e=>{
   for(const [uid,d] of [...heroesDesired]) if(d.eid < e.detail.eid) heroesDesired.delete(uid);
   for(const u of units) if(u.hero && u.hero.eid < e.detail.eid && !u.dead){ u.dead=true; u.deathT=0; }
   resetPredictUI();
-  if(db && fbUser) subscribePreds();
+  if(db) subscribePreds();   /* Google oyuncularının askerlerini HERKES görür (okuma halka açık) */
 });
 addEventListener("epoch-resolved", e=>{
   const {eid, close, winner} = e.detail;
@@ -1039,6 +1039,7 @@ async function initFirebase(){
       FB_CONF.databaseURL = "https://"+FB_CONF.projectId+"-default-rtdb.europe-west1.firebasedatabase.app";
     firebase.initializeApp(FB_CONF);
     db = firebase.database();
+    subscribePreds();          /* giriş beklemeden: Google askerleri tüm ziyaretçilere görünür */
     $("googleBtn").classList.remove("hidden");
     firebase.auth().onAuthStateChanged(u=>{
       fbUser=u;
